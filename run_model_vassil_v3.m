@@ -1,4 +1,8 @@
-
+% Version 3 - Alternative
+%
+% Change robot so that it determines heading before moving
+% and check performance
+%
 %----------------------------------------------%
 % Workspace Clear up
 close all;
@@ -49,7 +53,6 @@ for x=1:length(wall2)
     Obs_Matrix(ypos,xpos) = 1;
 end
 %----------------------------------------------%
-% add timer
 tic;
 %----------------------------------------------%
 for outer_loop = 1:(sim_time/dT)
@@ -67,8 +70,9 @@ for outer_loop = 1:(sim_time/dT)
     % get required heading for desired position
     [at_waypoint, desired_psi] = los_auto(cur_x,cur_y,desired_coord,point);
     % if at waypoint and if velocity is sufficiently low (stopped)
-    if at_waypoint == 1 && xi(13) <= 0.1   
+    if at_waypoint == 1 && xi(13) <= 0.1
        robot_path(point,:) = [cur_x,cur_y];
+       disp(n);
        if point < length(desired_coord)
         point = point+1;
        else
@@ -84,16 +88,16 @@ for outer_loop = 1:(sim_time/dT)
     err_psi(n) = desired_psi - cur_psi;
 
     err_xy(n) = pdist([desired_coord(point,:);cur_x,cur_y],'euclidean');
-
+    
     % then calculate necessary inputs for heading and velocity using
     % PID control;
-    Kp_psi = 20;   
+    Kp_psi = 25;   
     Ki_psi = .1;
     Kd_psi = .01;
 
-    Kp_xy = 5;   
+    Kp_xy = 6;   
     Ki_xy = .1;
-    Kd_xy = 1;
+    Kd_xy = 2;
  
     if n == 1
         prev_n = 1;
@@ -131,10 +135,13 @@ for outer_loop = 1:(sim_time/dT)
             err_psi_i(n) = 0;
         end
     end
+    % While the heading is wrong, don't move robot
+    if abs(err_psi(n)) > 0.1
+        u_xy(n) = 0;
+    end
     
-        
     % and then convert them into voltages:
-
+    
     Vl = (u_xy(n) + u_psi(n))/2;
     Vr = (u_xy(n) - u_psi(n))/2;
     
@@ -177,7 +184,7 @@ for outer_loop = 1:(sim_time/dT)
     
 end
 %----------------------------------------------%
-% Plot which points the robot reached and path
+% Plot which points the robot reached
 figure(1);
 for i=1:1:length(desired_coord)
     plot(robot_path(i,2),robot_path(i,1),'-x');
