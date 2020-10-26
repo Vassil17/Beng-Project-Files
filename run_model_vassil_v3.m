@@ -1,4 +1,8 @@
-
+% Robot Controller Model
+% by Vassil Atanassov
+%
+% This version uses two PID controllers for heading and distance errors
+% and corrects both simultaneously.
 %----------------------------------------------%
 % Workspace Clear up
 close all;
