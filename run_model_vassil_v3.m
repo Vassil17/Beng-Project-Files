@@ -105,16 +105,14 @@ for outer_loop = 1:(sim_time/dT)
         prev_n = n-1;
     end
     % For error in psi:
-    %
     % Using Euler's backward rule
     err_psi_i(n) = err_psi_i(prev_n)  + err_psi(n)*dT; 
     err_psi_d(n) = (err_psi(n) - err_psi(prev_n))/dT;
     
     u_psi(n) = Kp_psi * err_psi(n) + Ki_psi * err_psi_i(n) +...
         + Kd_psi * err_psi_d(n) ;
-    %
-    %
-    % For error in xy:
+    
+    % For error in distance:
     err_xy_i(n) = err_xy_i(prev_n)  + err_xy(n)*dT;
     err_xy_d(n) = (err_xy(n) - err_xy(prev_n))/dT;
     
@@ -135,14 +133,13 @@ for outer_loop = 1:(sim_time/dT)
             err_psi_i(n) = 0;
         end
     end
-    
-        
-    % and then convert them into voltages:
+    %
+    %   
 
     Vl = (u_xy(n) + u_psi(n))/2;
     Vr = (u_xy(n) - u_psi(n))/2;
     
-    
+    % Set up limits for Vl and Vr
     if Vl > 7.4 || Vl < -7.4
         Vl = sign(Vl)*7.4;
     end
@@ -150,8 +147,9 @@ for outer_loop = 1:(sim_time/dT)
         Vr = sign(Vr)*7.4;
     end
     
-     V_matrix(1,n) = Vl;
-     V_matrix(2,n) = Vr;
+    % Store Vl and Vr
+    V_matrix(1,n) = Vl;
+    V_matrix(2,n) = Vr;
 
     %
     %
