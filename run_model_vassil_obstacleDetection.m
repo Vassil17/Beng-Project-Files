@@ -12,11 +12,11 @@ clc;
 
 %----------------------------------------------%
 % Setup Simulation
-desired_coord(1,:) = [-3 -3];
-% desired_coord(2,:) = [-3 0];
-% desired_coord(3,:) = [-1 4];
-% desired_coord(4,:) = [-1 -2];
-% desired_coord(5,:) = [-0.2 2];
+desired_coord(1,:) = [-3 0];
+desired_coord(2,:) = [0 0];
+desired_coord(3,:) = [-1 4];
+desired_coord(4,:) = [-1 -2];
+desired_coord(5,:) = [-0.2 2];
 sim_time = 100;
 dT = 0.05;
 point = 1;
@@ -97,9 +97,26 @@ for outer_loop = 1:(sim_time/dT)
     %
     % First calculate error err_psi between current and desired heading,
     % then error between current and desired distance
-
-    err_psi(n) = desired_psi - cur_psi;
-
+    if cur_psi < 0 
+        cur_psi_360 = cur_psi + 2*pi;
+    elseif cur_psi >= 2*pi
+        cur_psi_360 = cur_psi - 2*pi;
+    else  
+        cur_psi_360 = cur_psi;
+    end
+    if desired_psi < 0
+        desired_psi_360 = desired_psi + 2*pi;
+    elseif desired_psi >= 2*pi
+        desired_psi_360 = desired_psi - 2*pi;
+    else
+        desired_psi_360 = desired_psi;
+    end
+    
+    err_psi(n) = desired_psi - cur_psi_360;
+    % error shouldn't be bigger than 180 degrees:
+    if abs(err_psi(n)) > pi
+        err_psi(n)=-sign(err_psi(n))*(2*pi-abs(err_psi(n)));
+    end
     err_xy(n) = pdist([desired_coord(point,:);cur_x,cur_y],'euclidean');
     
     % then calculate necessary inputs for heading and velocity using
