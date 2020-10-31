@@ -7,10 +7,10 @@ x(end-2:end)=[];
 y(end-2:end)=[];
 % counter for number of detections
 k=0;
-% map sensor cone to the obstacle matrix
-for i=1:size(x,2)
-    theta_current=theta(1,i);
-    for l=1:-0.01:0.01
+% check each point of the matrix
+for l=1:-0.01:0.01
+    for i=1:size(x,2)
+        theta_current=theta(1,i);
         xdist = l*cos(theta_current);
         ydist = l*sin(theta_current);
         sensorPosX = round((xdist/0.01) + cur_y/0.01 +((max_x/2)/0.01));
@@ -26,7 +26,7 @@ for i=1:size(x,2)
            distance(k) = sqrt((xdist)^2+(ydist)^2);
            objectDetected = 1;
         end
-     end
+    end
 end
 if ~exist('objectDetected','var')
     objectDetected = 0;
