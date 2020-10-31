@@ -13,11 +13,11 @@ clc;
 
 %----------------------------------------------%
 % Setup Simulation
-desired_coord(1,:) = [0 3];
+desired_coord(1,:) = [3 0];
 desired_coord(2,:) = [1 2];
 desired_coord(3,:) = [-1 4];
 desired_coord(4,:) = [-1 -2];
-desired_coord(5,:) = [-0.2 2];
+desired_coord(5,:) = [-0 2];
 sim_time = 100;
 dT = 0.05;
 point = 1;
@@ -118,6 +118,8 @@ for outer_loop = 1:(sim_time/dT)
         err_psi(n)=-sign(err_psi(n))*(2*pi-abs(err_psi(n)));
     end
     [desired_vel] = getVelocity(desired_coord(point,:),cur_x,cur_y);
+
+
     err_vel(n) = desired_vel - cur_vel;
     
 
@@ -125,13 +127,13 @@ for outer_loop = 1:(sim_time/dT)
     
     % PID Controllers for heading and velocity:
     
-    Kp_psi = 20;   % 25
-    Ki_psi = .005;   % .1
+    Kp_psi = 15;   % 25
+    Ki_psi = .1;   % .1
     Kd_psi = .01;  % .01
 
-    Kp_vel = 15;  
-    Ki_vel = 30; 
-    Kd_vel = 0.005;  
+    Kp_vel = 5;  
+    Ki_vel = 70; 
+    Kd_vel = .01;   
  
     if n == 1
         prev_n = 1;
@@ -153,12 +155,12 @@ for outer_loop = 1:(sim_time/dT)
     err_vel_d(n) = (err_vel(n) - err_vel(prev_n))/dT;
     
     u_vel(n) = Kp_vel*err_vel(n)+Ki_vel*err_vel_i(n)+Kd_vel*err_vel_d(n);
-    
-    err_distance(n) = pdist([desired_coord(point,:);cur_x,cur_y],'euclidean');  
+      
     % While the heading is wrong, don't move robot
     if abs(err_psi(n)) > 0.1 
         u_vel(n) = 0;
     end
+
     %------------------------------------------------------------------%
     % Convert inputs into voltages:
     
