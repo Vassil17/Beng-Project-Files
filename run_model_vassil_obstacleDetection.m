@@ -72,11 +72,7 @@ for outer_loop = 1:(sim_time/dT)
     [objectDetected] = obstacleSensor(cur_psi,cur_x,cur_y,max_x,max_y,Obs_Matrix);
     if objectDetected == 1
         [objectDetected,distance_min] = obstacleSensor(cur_psi,cur_x,cur_y,max_x,max_y,Obs_Matrix);
-        fprintf('Object Detected at %.2f \n',distance_min);
-        if distance_min < 0.4
-            fprintf('Stop, object is too close!\n');
-%             break;
-        end
+        fprintf('Object Detected in %.2f \n',distance_min);
     end
     % get required heading for desired position
     [at_waypoint, desired_psi] = los_auto(cur_x,cur_y,desired_coord,point);
@@ -92,11 +88,14 @@ for outer_loop = 1:(sim_time/dT)
         break;
        end
     end
+    %---------------------------------------------------------------------%
     % Once we've obtained the desired heading a controller needs to be
     % designed to feed appropriate voltages into the motors
     %
     % First calculate error err_psi between current and desired heading,
     % then error between current and desired distance
+    
+    % Change heading to be from 0 to 360 degrees
     if cur_psi < 0 
         cur_psi_360 = cur_psi + 2*pi;
     elseif cur_psi >= 2*pi
@@ -119,8 +118,10 @@ for outer_loop = 1:(sim_time/dT)
     end
     err_xy(n) = pdist([desired_coord(point,:);cur_x,cur_y],'euclidean');
     
-    % then calculate necessary inputs for heading and velocity using
-    % PID control;
+    %---------------------------------------------------------------------%
+    
+    % PID Controllers for heading and distance:
+    
     Kp_psi = 25;   
     Ki_psi = .1;
     Kd_psi = .01;
@@ -154,8 +155,8 @@ for outer_loop = 1:(sim_time/dT)
     if abs(err_psi(n)) > 0.1
         u_xy(n) = 0;
     end
-    
-    % and then convert them into voltages:
+    %------------------------------------------------------------------%
+    % Convert inputs into voltages:
     
     Vl = (u_xy(n) + u_psi(n))/2;
     Vr = (u_xy(n) - u_psi(n))/2;
