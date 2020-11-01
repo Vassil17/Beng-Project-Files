@@ -13,12 +13,12 @@ clc;
 
 %----------------------------------------------%
 % Setup Simulation
-desired_coord(1,:) = [3 0];
-desired_coord(2,:) = [1 2];
+desired_coord(1,:) = [0 2];
+desired_coord(2,:) = [4 0];
 desired_coord(3,:) = [-1 4];
-desired_coord(4,:) = [-1 -2];
+desired_coord(4,:) = [0 0];
 desired_coord(5,:) = [-0 2];
-sim_time = 100;
+sim_time = 60;
 dT = 0.05;
 point = 1;
 xi = zeros(1,24); % initial state for x
@@ -118,22 +118,27 @@ for outer_loop = 1:(sim_time/dT)
         err_psi(n)=-sign(err_psi(n))*(2*pi-abs(err_psi(n)));
     end
     [desired_vel] = getVelocity(desired_coord(point,:),cur_x,cur_y);
+    % store desired velocity throughout simulation for later plotting
+    desired_velocity(n) = desired_vel;
 
-
-    err_vel(n) = desired_vel - cur_vel;
+    % While the heading is wrong, don't move robot
+    if abs(err_psi(n)) > 0.2
+        desired_vel = 0;
+    end
     
-
-    %---------------------------------------------------------------------%
+    
+    err_vel(n) = desired_vel - cur_vel;
+%---------------------------------------------------------------------%
     
     % PID Controllers for heading and velocity:
     
-    Kp_psi = 15;   % 25
-    Ki_psi = .1;   % .1
-    Kd_psi = .01;  % .01
+    Kp_psi = 20;  
+    Ki_psi = 0.1;   
+    Kd_psi = 0.1;  
 
-    Kp_vel = 5;  
-    Ki_vel = 70; 
-    Kd_vel = .01;   
+    Kp_vel = 2.5;  %5
+    Ki_vel = 35;   %70
+    Kd_vel = .01;  %.01
  
     if n == 1
         prev_n = 1;
@@ -156,13 +161,16 @@ for outer_loop = 1:(sim_time/dT)
     
     u_vel(n) = Kp_vel*err_vel(n)+Ki_vel*err_vel_i(n)+Kd_vel*err_vel_d(n);
       
-    % While the heading is wrong, don't move robot
-    if abs(err_psi(n)) > 0.1 
-        u_vel(n) = 0;
-    end
+    
 
     %------------------------------------------------------------------%
     % Convert inputs into voltages:
+    
+    if abs(u_vel(n))> 12
+        u_vel(n) = sign(u_vel(n))*12;
+    end
+    
+    
     
     Vl = (u_vel(n) + u_psi(n))/2;
     Vr = (u_vel(n) - u_psi(n))/2;
@@ -219,4 +227,5 @@ toc;
 figure(2); plot(xio(:,20),xio(:,19));
 figure(3); plot(xio(:,19));
 figure(4); plot(xio(:,24));
+%figure(5);hold on; plot(xio(:,13));
 %----------------------------------------------%

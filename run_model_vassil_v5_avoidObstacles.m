@@ -13,12 +13,12 @@ clc;
 
 %----------------------------------------------%
 % Setup Simulation
-desired_coord(1,:) = [3 0];
-desired_coord(2,:) = [1 2];
-desired_coord(3,:) = [-1 4];
-desired_coord(4,:) = [-1 -2];
-desired_coord(5,:) = [-0 2];
-sim_time = 50;
+desired_coord(1,:) = [4 0];
+% desired_coord(2,:) = [4 0];
+% desired_coord(3,:) = [-1 4];
+% desired_coord(4,:) = [0 0];
+% desired_coord(5,:) = [-0 2];
+sim_time = 60;
 dT = 0.05;
 point = 1;
 xi = zeros(1,24); % initial state for x
@@ -26,6 +26,8 @@ LeftS = 0;
 RightS = 0;
 err_psi_i(1) = 0;
 err_vel_i(1) = 0;
+stopRobot = 0;
+moveToAvoid = 0;
 
 %----------------------------------------------%
 
@@ -36,7 +38,7 @@ max_y = 10;
 
 Obs_Matrix = zeros(max_x/0.01,max_y/0.01);
 
-wall = WallGeneration1(-1, 1,2,2,'h');
+wall = WallGeneration1(-1, 1,3,3,'h');
 wall2 = WallGeneration1(-3, -3, -2, 2,'v');
 
 for x=1:length(wall)
@@ -68,27 +70,39 @@ for outer_loop = 1:(sim_time/dT)
     cur_psi = xi(24);
     cur_vel = xi(13);
     n = outer_loop;
-
+    
+    
     % Check the sensors for objects:
     [objectDetected] = obstacleSensor(cur_psi,cur_x,cur_y,max_x,max_y,Obs_Matrix);
+    % if object is detected, get distance
     if objectDetected == 1
         [objectDetected,distance_min] = obstacleSensor(cur_psi,cur_x,cur_y,max_x,max_y,Obs_Matrix);
-        fprintf('Object Detected in %.2f \n',distance_min);
     end
-    % get required heading for desired position
-    [at_waypoint, desired_psi] = los_auto(cur_x,cur_y,desired_coord,point);
-    % if at waypoint
-    if at_waypoint == 1 && cur_vel <= 0.01
-       robot_path(point,:) = [cur_x,cur_y];
-       if point < size(desired_coord,1)
-        % look at the next desired point
-        point = point+1;
+    % if object is detected and distance is small
+    if objectDetected == 1 && distance_min < 0.8
+           % stop robot;
+           stopRobot = 1;
+           [desired_psi] = objectDetection(cur_psi);
+           moveToAvoid = 1;
+           loc = [cur_x cur_y];
+    elseif moveToAvoid == 1
+        stopRobot = 0;
+        % if robot has moved some distance to avoid object, go back to
+        % going to desired location
+        if sqrt((cur_x - loc(1))^2 + (cur_y - loc(2))^2) > 1.5
+            moveToAvoid = 0;
+        end
+        
+    else
+        % otherwise go to desired location
         [at_waypoint, desired_psi] = los_auto(cur_x,cur_y,desired_coord,point);
-       else
-        break;
-       end
     end
     
+    if at_waypoint == 1 && cur_vel <= 0.01
+       robot_path(point,:) = [cur_x,cur_y];
+       break;
+    end
+       
     %---------------------------------------------------------------------%
     % Once we've obtained the desired heading a controller needs to be
     % designed to feed appropriate voltages into the motors
@@ -113,37 +127,34 @@ for outer_loop = 1:(sim_time/dT)
     end
     
     err_psi(n) = desired_psi - cur_psi_360;
-
     % error shouldn't be bigger than 180 degrees:
     if abs(err_psi(n)) > pi
         err_psi(n)=-sign(err_psi(n))*(2*pi-abs(err_psi(n)));
     end
-
-    [desired_vel] = getVelocity(desired_coord(point,:),cur_x,cur_y);
-    %--------------------------------------------------------------------%
-    % Tell robot to stop if object close to it.
-    if objectDetected == 1
-        if distance_min < 0.5
-            desired_vel = 0;
-
-        end
+    % If robot has been told to stop or heading is 0, set vel to 0
+    if stopRobot == 1 || abs(err_psi(n)) > 0.2
+        desired_vel = 0;
+    elseif moveToAvoid ==1
+        desired_vel = 1;
+    else
+        [desired_vel] = getVelocity(desired_coord(point,:),cur_x,cur_y);
     end
+    % store desired velocity throughout simulation for later plotting
+    desired_velocity(n) = desired_vel;
     
     err_vel(n) = desired_vel - cur_vel;
-    
-
-    %---------------------------------------------------------------------%
-    
+%---------------------------------------------------------------------%
+        
     % PID Controllers for heading and velocity:
-    
-    Kp_psi = 15;   % 25
-    Ki_psi = .1;   % .1
-    Kd_psi = .01;  % .01
 
-    Kp_vel = 5;  
-    Ki_vel = 70; 
-    Kd_vel = .01;  
- 
+    Kp_psi = 20;  
+    Ki_psi = 0.1;   
+    Kd_psi = 0.1;  
+
+    Kp_vel = 2.5;  %5
+    Ki_vel = 35;   %70
+    Kd_vel = .01;  %.01
+
     if n == 1
         prev_n = 1;
     else
@@ -154,7 +165,7 @@ for outer_loop = 1:(sim_time/dT)
     % Using Euler's backward rule
     err_psi_i(n) = err_psi_i(prev_n)  + err_psi(n)*dT; 
     err_psi_d(n) = (err_psi(n) - err_psi(prev_n))/dT;
-    
+
     u_psi(n) = Kp_psi * err_psi(n) + Ki_psi * err_psi_i(n) +...
         + Kd_psi * err_psi_d(n) ;
     %
@@ -162,27 +173,26 @@ for outer_loop = 1:(sim_time/dT)
     % For error in velocity:
     err_vel_i(n) = err_vel_i(prev_n)  + err_vel(n)*dT;
     err_vel_d(n) = (err_vel(n) - err_vel(prev_n))/dT;
-    
+
     u_vel(n) = Kp_vel*err_vel(n)+Ki_vel*err_vel_i(n)+Kd_vel*err_vel_d(n);
-      
-    % While the heading is wrong, don't move robot
-    if abs(err_psi(n)) > 0.1 
-        u_vel(n) = 0;
+%------------------------------------------------------------------%
+% Convert inputs into voltages:    
+    if abs(u_vel(n))> 12
+        u_vel(n) = sign(u_vel(n))*12;
     end
-    
-    %------------------------------------------------------------------%
-    % Convert inputs into voltages:
-    
+
+
     Vl = (u_vel(n) + u_psi(n))/2;
     Vr = (u_vel(n) - u_psi(n))/2;
-    
-    
-    if Vl >= 7.4 || Vl <= -7.4
+
+
+    if Vl > 7.4 || Vl < -7.4
         Vl = sign(Vl)*7.4;
     end
-    if Vr >= 7.4 || Vr <= -7.4
+    if Vr > 7.4 || Vr < -7.4
         Vr = sign(Vr)*7.4;
     end
+
     
      V_matrix(1,n) = Vl;
      V_matrix(2,n) = Vr;
@@ -225,8 +235,8 @@ end
 %----------------------------------------------%
 toc;
 %Plot Variables
-% figure(2); plot(xio(:,20),xio(:,19));
-% figure(3); plot(xio(:,19));
-% figure(4); plot(xio(:,24));
- figure(5); plot(xio(:,13));
+figure(2); plot(xio(:,20),xio(:,19));
+figure(3); plot(xio(:,19));
+figure(4); plot(xio(:,24));
+%figure(5);hold on; plot(xio(:,13));
 %----------------------------------------------%
