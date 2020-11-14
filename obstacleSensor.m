@@ -7,6 +7,7 @@ x(end-2:end)=[];
 y(end-2:end)=[];
 
 % First build the vision matrix
+% l goes from 0 to 1(length of vision cone radius) in 0.01 increments
 for l=0:0.01:1
     for i=1:size(x,2)
         theta_current=theta(1,i);
@@ -17,18 +18,18 @@ for l=0:0.01:1
         visionMatrix(Y,X) = 1;
     end
 end
-% find where 1s appear in the same indeces in the vision and obstacle
+% find where 1s appear in the same indices in the vision and obstacle
 % matrices
 detections=visionMatrix & Obs_Matrix;
 [row,col] = find(detections==1);
+% if no matches are found then no object has been detected
 if isempty(row) || isempty(col)
    objectDetected = 0;
+% otherwise object has been detected, find mean distance
 else
     objectDetected = 1;
     distance = sqrt((cur_x+(max_y/2) - mean(row)*0.01)^2 +...
         (cur_y+(max_x/2) - mean(col)*0.01)^2);
 end
-
-
 end
 
