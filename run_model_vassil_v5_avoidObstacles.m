@@ -13,7 +13,7 @@ clc;
 
 %----------------------------------------------%
 % Setup Simulation
-desired_coord(1,:) = [4 0];
+desired_coord(1,:) = [0 -4];
 % desired_coord(2,:) = [4 0];
 % desired_coord(3,:) = [-1 4];
 % desired_coord(4,:) = [0 0];
@@ -36,9 +36,11 @@ moveToAvoid = 0;
 max_x = 10;
 max_y = 10;
 
-Obs_Matrix = zeros(max_x/0.01,max_y/0.01);
 
-wall = WallGeneration1(-1, 1,3,3,'h');
+Obs_Matrix = zeros(max_x/0.01,max_y/0.01);
+visionMatrix = zeros(max_x/0.01,max_y/0.01);
+
+wall = WallGeneration1(-1, 1,1,1,'h');
 wall2 = WallGeneration1(-3, -3, -2, 2,'v');
 
 for x=1:length(wall)
@@ -70,16 +72,22 @@ for outer_loop = 1:(sim_time/dT)
     cur_psi = xi(24);
     cur_vel = xi(13);
     n = outer_loop;
+    % Set up sensor position (y,x) for each sensor for psi=0;
     
-    
-    % Check the sensors for objects:
-    [objectDetected] = obstacleSensor(cur_psi,cur_x,cur_y,max_x,max_y,Obs_Matrix);
-    % if object is detected, get distance
-    if objectDetected == 1
-        [objectDetected,distance_min] = obstacleSensor(cur_psi,cur_x,cur_y,max_x,max_y,Obs_Matrix);
+    sensors = [0.1 0.1;0.1 -0.1];
+    % Create each sensor:
+    for i=1:length(sensors)
+       % use rotation matrix to find sensor position based on heading
+       sensors(i,:) = transpose(([cos(cur_psi), -sin(cur_psi);sin(cur_psi), cos(cur_psi)]*sensors(i,:)'));
+       objectDetected(i) = obstacleSensor(cur_psi,cur_x,cur_y,sensors(i,:),max_x,max_y,Obs_Matrix,visionMatrix);
+       if objectDetected(i) == 1
+           [~,distance] = obstacleSensor(cur_psi,cur_x,cur_y,sensors(i,:),max_x,max_y,Obs_Matrix,visionMatrix);
+           fprintf('Object detected by sensor %i at %i\n',i,distance);
+       end
     end
+
     % if object is detected and distance is small
-    if objectDetected == 1 && distance_min < 0.8
+    if any(objectDetected) && distance < 0.8
            % stop robot;
            stopRobot = 1;
            [desired_psi] = objectDetection(cur_psi);
@@ -217,7 +225,9 @@ for outer_loop = 1:(sim_time/dT)
     figure(1);
     clf; hold on; grid on; axis([-5,5,-5,5]);
     drawrobot(0.2,xi(20),xi(19),xi(24),'b');
-    drawSensorCone(xi(24),xi(19),xi(20),1);
+    for i=1:length(sensors)
+        drawSensorCone(xi(24),xi(19)+sensors(i,1),xi(20)+sensors(i,2),1);
+    end
     xlabel('y, m'); ylabel('x, m');  
     plot(wall(:,1),wall(:,2),'k-');
     plot(wall2(:,1),wall2(:,2),'k-');
