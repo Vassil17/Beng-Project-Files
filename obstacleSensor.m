@@ -1,6 +1,7 @@
-function [objectDetected,distance] = obstacleSensor(cur_psi,cur_x,cur_y,sensors,max_x,max_y,Obs_Matrix,visionMatrix)
+function [objectDetected,distance] = obstacleSensor(sensorAngle,cur_x,...
+                        cur_y,sensors,max_x,max_y,Obs_Matrix,visionMatrix)
 % Check what the sensor cone "sees"
-[x,y,theta]=drawSensorCone(cur_psi,cur_x+sensors(1),cur_y+sensors(2),0);
+[x,y,theta]=drawSensorCone(sensorAngle,cur_x+sensors(1),cur_y+sensors(2),0);
 % remove last two elements of x and y (as they are only needed for the cone
 % plot)
 x(end-2:end)=[];
@@ -18,6 +19,8 @@ for l=0:0.01:1
         visionMatrix(Y,X) = 1;
     end
 end
+
+
 % find where 1s appear in the same indices in the vision and obstacle
 % matrices
 detections=visionMatrix & Obs_Matrix;
