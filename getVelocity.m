@@ -7,7 +7,7 @@ function [desired_vel] = getVelocity(desired_coord,cur_x,cur_y)
   elseif abs(distance) < 0.2
       desired_vel = 0;
   else
-      desired_vel = 1;
+      desired_vel = 0.75;
   end
 
 end

@@ -28,11 +28,14 @@ detections=visionMatrix & Obs_Matrix;
 % if no matches are found then no object has been detected
 if isempty(row) || isempty(col)
    objectDetected = 0;
+   distance = NaN;
 % otherwise object has been detected, find mean distance
 else
     objectDetected = 1;
-    distance = sqrt((cur_x+(max_y/2) - mean(row)*0.01)^2 +...
-        (cur_y+(max_x/2) - mean(col)*0.01)^2);
+    distance(1) = sqrt((cur_x+(max_y/2) - max(row)*0.01)^2 +...
+        (cur_y+(max_x/2) - max(col)*0.01)^2);
+    distance(2) = sqrt((cur_x+(max_y/2) - min(row)*0.01)^2 +...
+        (cur_y+(max_x/2) - min(col)*0.01)^2);
 end
 end
 
