@@ -1,9 +1,11 @@
 
-function wallout = WallGeneration(WallStarty, Wallendy,WallStartx ,Wallendx,walltype)
+function wallout = WallGeneration1(WallStarty, Wallendy,WallStartx ,Wallendx,walltype)
 
 % Create Wall Object
-Numberpointsy = abs(WallStarty)+abs(Wallendy);
-Numberpointsx = abs(WallStartx)+abs(Wallendx);
+Numberpointsy = abs(WallStarty-Wallendy);
+Numberpointsx = abs(WallStartx-Wallendx);
+
+
 
 if walltype == 'h'
       Wall2(1,:) = [WallStarty, WallStartx];
