@@ -231,7 +231,6 @@ end
 % Plot which points the robot reached
 figure(1);
 for i=1:1:size(desired_coord,1)
-    plot(robot_path(i,2),robot_path(i,1),'-x');
     plot(xio(:,20),xio(:,19),'k');
 end
 %----------------------------------------------%
