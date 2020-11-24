@@ -1,4 +1,4 @@
-% Version 6 - Follow Wall
+% Version 7 - LIDAR
 %
 %
 %
@@ -12,7 +12,7 @@ clc;
 
 %----------------------------------------------%
 % Setup Simulation
-desired_coord(1,:) = [4 0];
+desired_coord(1,:) = [7 5];
 sim_time = 60;
 dT = 0.05;
 point = 1;
@@ -31,28 +31,29 @@ originalPosition = 0;
 % Create Environment
 max_x = 10;
 max_y = 10;
+resolution = 10;
+% Create the obstacle map
+obstacleMap = binaryOccupancyMap(max_x,max_y,resolution);
 
 
-Obs_Matrix = zeros(max_x/0.01,max_y/0.01);
-visionMatrix = zeros(max_x/0.01,max_y/0.01);
 % walls are now contained in a cell
-wall{1} = WallGeneration1(-1, 1,-2,-2,'h');
-wall{2} = WallGeneration1(1, 1, -2, 0.49,'v');
-wall{3} = WallGeneration1(-1, 1,0.5,0.5,'h');
-wall{4} = WallGeneration1(-1, -1, -0.5, 0.49,'v');
-wall{5} = WallGeneration1(-3, -1,-0.49,-0.49,'h');
-% wall{6}
 
+wall{1} = WallGeneration1(7,7,6,8,'v');
+wall{2} = WallGeneration1(2,7,6,6,'h');
+wall{3} = WallGeneration1(2,7,8,8,'h');
 
-
-for counter = 1:length(wall) % for each wall
-    for x=1:length(wall{counter}) % for each point in wall
-        % xpos = x point of wall  + origin
-        xpos = (round(wall{counter}(x,1)/0.01))+((max_x/2)/0.01);
-        ypos = (round(wall{counter}(x,2)/0.01))+((max_y/2)/0.01);
-
-        Obs_Matrix(ypos,xpos) = 1;
+% % wall{6}
+for counter=1:length(wall)
+    clear x; clear y;
+    for i=1:length(wall{counter})
+        x(i) = wall{counter}(i,1);
+        y(i) = wall{counter}(i,2);        
     end
+    x=x.';
+    y=y.';
+
+    setOccupancy(obstacleMap, [x y], ones(i,1)) 
+
 end
 
 %----------------------------------------------%
@@ -64,44 +65,54 @@ for outer_loop = 1:(sim_time/dT)
     %
     %
     % CONTROLLER SECTION
-    cur_x = xi(19);
-    cur_y = xi(20);
+    cur_x = xi(19)+5;
+    cur_y = xi(20)+5;
     cur_psi = xi(24);
     cur_vel = xi(13);
     n = outer_loop;
-    % Set up sensor position (x,y) for each sensor for psi=0;
-    sensors = [0 0;0 0];
-    % Set up angle for each sensor
-    sensorAngle = [cur_psi,(cur_psi-pi/2)];
     
-    % Create each sensor:
-    for i=1:length(sensors)
-       % use rotation matrix to find sensor position based on heading
-       sensors(i,:) = transpose(([cos(cur_psi), -sin(cur_psi);sin(cur_psi), cos(cur_psi)]*sensors(i,:)'));
-       [objectDetected(i),distance(i,:)] = obstacleSensor(sensorAngle(i),cur_x,cur_y,sensors(i,:),...
-           max_x,max_y,Obs_Matrix,visionMatrix);
-       if objectDetected(i) == 1
-           fprintf('Object detected by sensor %i at %i\n',i,distance(i,1));
-       end
+
+    if cur_psi < 0 
+        cur_psi_360 = cur_psi + 2*pi;
+    elseif cur_psi >= 2*pi
+        cur_psi_360 = cur_psi - 2*pi;
+    else  
+        cur_psi_360 = cur_psi;
     end
     
+     % Set up sensor position (x,y) for each sensor for psi=0;
+    sensors = [cur_y cur_x; cur_y cur_x;];
+    % Set up angle for each sensor
+    sensorAngle = [cur_psi; cur_psi - pi/2];
+      
+    
+    % Create each sensor:
+    for i=1:size(sensors,1)
+        % rotation matrix isnt needed for now as sensors are at robot
+        % centre
+%       % use rotation matrix to find sensor position based on heading
+%       sensors(i,:) = transpose(([cos(cur_psi), -sin(cur_psi);sin(cur_psi), cos(cur_psi)]*sensors(i,:)'));
+       pose = [sensors(i,:)];
+       
+       [obstacleMap,scan(i),distance(i,:),objectDetected(i)]=lidarSensor(obstacleMap,pose,sensorAngle(i));
+    end
+    if distance(1,3) < 1
+        fprintf('Object too close! At %.2f m\n',distance(1));
+    end
 
 %-------------------------------------------------------------------------%
 % Behavior
 %
-position = [cur_x,cur_y];
-[desired_psi,state,stopRobot,originalPosition]=wallFollowing_ver2(objectDetected,...
+ position = [cur_y,cur_x];
+[desired_psi,state,stopRobot,originalPosition]=wallFollowing_lidar(objectDetected,...
     state,cur_psi,desired_psi,position,originalPosition,distance);  
 
-  
+% [at_waypoint, desired_psi] = los_auto(cur_x,cur_y,desired_coord,point);  
+% if at_waypoint == 1
+%     stopRobot=1;
+% end
 %-------------------------------------------------------------------------%    
-% if robot is at desired location and velocity is very low -> save location
-% for path plotting
-%     if at_waypoint == 1 && cur_vel <= 0.01
-%        robot_path(point,:) = [cur_x,cur_y];
-%        break;
-%     end
-%        
+
     %---------------------------------------------------------------------%
     % Once we've obtained the desired heading a controller needs to be
     % designed to feed appropriate voltages into the motors
@@ -111,13 +122,7 @@ position = [cur_x,cur_y];
         
 
     % Change heading to be from 0 to 360 degrees
-    if cur_psi < 0 
-        cur_psi_360 = cur_psi + 2*pi;
-    elseif cur_psi >= 2*pi
-        cur_psi_360 = cur_psi - 2*pi;
-    else  
-        cur_psi_360 = cur_psi;
-    end
+    
     if desired_psi < 0
         desired_psi_360 = desired_psi + 2*pi;
     elseif desired_psi >= 2*pi
@@ -214,15 +219,15 @@ position = [cur_x,cur_y];
     
     %----------------------------------------------%
     figure(1);
-    clf; hold on; grid on; axis([-5,5,-5,5]);
-    drawrobot(0.2,xi(20),xi(19),xi(24),'b');
-    for i=1:length(sensors)
-        drawSensorCone(sensorAngle(i),xi(19)+sensors(i,1),xi(20)+sensors(i,2),1);
-    end
-    xlabel('y, m'); ylabel('x, m');  
-    for counter=1:length(wall)
-        plot(wall{counter}(:,1),wall{counter}(:,2),'k-');   
-    end
+    clf; hold on; grid on; show(obstacleMap);
+    drawrobot(0.2,xi(20)+5,xi(19)+5,xi(24),'b');
+%     for i=1:length(sensors)
+%         drawSensorCone(sensorAngle(i),xi(19)+sensors(i,1),xi(20)+sensors(i,2),1);
+%     end
+%    xlabel('x, m'); ylabel('y, m');  
+%     for counter=1:length(wall)
+%         plot(wall{counter}(:,1),wall{counter}(:,2),'k-');   
+%     end
     pause(0.001);
     %----------------------------------------------%
     
@@ -232,13 +237,13 @@ end
 figure(1);
 for i=1:1:size(desired_coord,1)
     plot(robot_path(i,2),robot_path(i,1),'-x');
-    plot(xio(:,20),xio(:,19),'k');
+    plot(xio(:,19),xio(:,20),'k');
 end
 %----------------------------------------------%
 toc;
 %Plot Variables
-figure(2); plot(xio(:,20),xio(:,19));
-figure(3); plot(xio(:,19));
-figure(4); plot(xio(:,24));
+% figure(2); plot(xio(:,20),xio(:,19));
+% figure(3); plot(xio(:,19));
+% figure(4); plot(xio(:,24));
 %figure(5);hold on; plot(xio(:,13));
 %----------------------------------------------%

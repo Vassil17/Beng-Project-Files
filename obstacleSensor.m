@@ -1,11 +1,21 @@
 function [objectDetected,distance] = obstacleSensor(sensorAngle,cur_x,...
-                        cur_y,sensors,max_x,max_y,Obs_Matrix,visionMatrix)
+                        cur_y,sensors,max_x,max_y,obstacleMap)
 % Check what the sensor cone "sees"
 [x,y,theta]=drawSensorCone(sensorAngle,cur_x+sensors(1),cur_y+sensors(2),0);
 % remove last two elements of x and y (as they are only needed for the cone
 % plot)
 x(end-2:end)=[];
 y(end-2:end)=[];
+
+%pose = [sensors, sensorAngle];
+pose = [5 5 0];
+ranges = ones(100,1);
+angles = linspace(-pi/2,pi/2,100);
+maxrange = 20;
+
+scan = lidarScan(ranges,angles);
+insertRay(obstacleMap,pose,scan,maxrange);
+
 
 % First build the vision matrix
 % l goes from 0 to 1(length of vision cone radius) in 0.01 increments

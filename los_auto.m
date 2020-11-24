@@ -18,7 +18,7 @@ waypoint = desired_pt;
 % check to see if in acceptance radius
 cur_radius = sqrt(((cur_x-waypoint(1))^2)+((cur_y-waypoint(2))^2));
 
-if (cur_radius < 0.1),
+if (cur_radius < 0.2),
     at_waypoint = 1;
 else
     at_waypoint = 0;
