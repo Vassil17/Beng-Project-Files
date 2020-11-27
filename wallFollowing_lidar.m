@@ -37,7 +37,7 @@ elseif state == 0
         originalPosition = position;
         state = 2;
         stopRobot=1;
-    elseif objectDetected(2) == 0 || (all(objectDetected)&& distance(1)<0.8) % if there's no left wall
+    elseif (objectDetected(2) == 0 || all(objectDetected))&& distance(1,3)<0.8 % if there's no left wall
         desired_psi = cur_psi + pi/2;  
         state = 1;  
         stopRobot=1;

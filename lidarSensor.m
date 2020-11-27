@@ -13,8 +13,8 @@ scan = lidarScan(ranges,angles);
 minRange = 0;
 maxRange = 1;
 % min and max angles are with relation to the pose angle (not global angle)
-minAngle = -pi/10;
-maxAngle = pi/10;
+minAngle = -pi/12;
+maxAngle = pi/12;
 
 scan = removeInvalidData(scan,'RangeLimits',[minRange maxRange],...
     'AngleLimits',[minAngle maxAngle]);
