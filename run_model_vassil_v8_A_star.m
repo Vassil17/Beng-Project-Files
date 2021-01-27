@@ -12,7 +12,7 @@ clc;
 
 %----------------------------------------------%
 % Setup Simulation
-desired_coord(1,:) = [4 1];
+desired_coord(1,:) = [7 5];
 sim_time = 60;
 dT = 0.05;
 point = 1;
@@ -24,8 +24,8 @@ err_vel_i(1) = 0;
 stopRobot = 0;
 state = 0;
 desired_psi = 0;
-desired_psi_360=0;
 originalPosition = 0;
+
 %----------------------------------------------%
 
 %----------------------------------------------%
@@ -56,7 +56,15 @@ for counter=1:length(wall)
     setOccupancy(obstacleMap, [x y], ones(i,1)) 
 
 end
-
+% Initialise the counter for following the path
+current = 1;
+obstacleMatrix = occupancyMatrix(obstacleMap);
+start=[50,50];
+ending=[60,60];
+path = Astar(obstacleMatrix, start, ending);
+for i=1:size(path,2)
+    path{i}=path{i}/10;
+end
 %----------------------------------------------%
 tic;
 %----------------------------------------------%
@@ -71,8 +79,7 @@ for outer_loop = 1:(sim_time/dT)
     cur_psi = xi(24);
     cur_vel = xi(13);
     n = outer_loop;
-
-    % Change heading to be from 0 to 360 degrees   
+    
 
     if cur_psi < 0 
         cur_psi_360 = cur_psi + 2*pi;
@@ -82,8 +89,6 @@ for outer_loop = 1:(sim_time/dT)
         cur_psi_360 = cur_psi;
     end
     
-       
-
      % Set up sensor position (x,y) for each sensor for psi=0;
     sensors = [cur_y cur_x; cur_y cur_x;];
     % Set up angle for each sensor
@@ -108,13 +113,15 @@ for outer_loop = 1:(sim_time/dT)
 % Behavior
 %
  position = [cur_y,cur_x];
-[desired_psi,state,stopRobot,originalPosition]=wallFollowing_lidar(objectDetected,...
-    state,cur_psi,desired_psi,position,originalPosition,distance);  
+ goal=path{current};
+ if ~any((position-goal)<0.05)
+     current=current+1;
+     goal=path{current};
+ else
+     [at_waypoint, desired_psi] = los_auto(cur_x,cur_y,goal); 
+ end
 
-% [at_waypoint, desired_psi] = los_auto(cur_x,cur_y,desired_coord,point);  
-% if at_waypoint == 1
-%     stopRobot=1;
-% end
+  
 %-------------------------------------------------------------------------%    
 
     %---------------------------------------------------------------------%
@@ -124,10 +131,11 @@ for outer_loop = 1:(sim_time/dT)
     % First calculate error err_psi between current and desired heading,
     % then error between current and desired distance
         
-% 
-    if desired_psi < 0
-    desired_psi_360 = desired_psi + 2*pi;
+
+    % Change heading to be from 0 to 360 degrees
     
+    if desired_psi < 0
+        desired_psi_360 = desired_psi + 2*pi;
     elseif desired_psi >= 2*pi
         desired_psi_360 = desired_psi - 2*pi;
     else
@@ -222,7 +230,7 @@ for outer_loop = 1:(sim_time/dT)
     
     %----------------------------------------------%
     figure(1);
-    clf; show(obstacleMap);grid on; hold on;
+    clf; hold on; grid on; show(obstacleMap);
     drawrobot(0.2,xi(20)+5,xi(19)+5,xi(24),'b');
 %     for i=1:length(sensors)
 %         drawSensorCone(sensorAngle(i),xi(19)+sensors(i,1),xi(20)+sensors(i,2),1);
@@ -239,8 +247,8 @@ end
 % Plot which points the robot reached
 figure(1);
 for i=1:1:size(desired_coord,1)
-   % plot(robot_path(i,2),robot_path(i,1),'-x');
-    plot(xio(:,20)+5,xio(:,19)+5,'k');
+    plot(robot_path(i,2),robot_path(i,1),'-x');
+    plot(xio(:,19),xio(:,20),'k');
 end
 %----------------------------------------------%
 toc;

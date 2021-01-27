@@ -12,7 +12,7 @@ clc;
 
 %----------------------------------------------%
 % Setup Simulation
-desired_coord(1,:) = [4 1];
+goal = [9 4];
 sim_time = 60;
 dT = 0.05;
 point = 1;
@@ -26,6 +26,8 @@ state = 0;
 desired_psi = 0;
 desired_psi_360=0;
 originalPosition = 0;
+check_for_goal = 0;
+isPathValid = 0;
 %----------------------------------------------%
 
 %----------------------------------------------%
@@ -35,13 +37,17 @@ max_y = 10;
 resolution = 10;
 % Create the obstacle map
 obstacleMap = binaryOccupancyMap(max_x,max_y,resolution);
-
-
+estimatedMap = binaryOccupancyMap(max_x,max_y,resolution);
+%
+%
+obsSensor = rangeSensor('HorizontalAngle', pi/8);
+numReadings = obsSensor.NumReadings;
 % walls are now contained in a cell
 
-wall{1} = WallGeneration1(7,7,6,8,'v');
-wall{2} = WallGeneration1(2,7,6,6,'h');
-wall{3} = WallGeneration1(2,7,8,8,'h');
+wall{1} = WallGeneration1(0,7,6,6,'h');
+wall{2} = WallGeneration1(3,10,7,7,'h');
+wall{3} = WallGeneration1(2,2,6,8,'v');
+wall{4} = WallGeneration1(2,8,8,8,'h');
 
 % % wall{6}
 for counter=1:length(wall)
@@ -81,7 +87,6 @@ for outer_loop = 1:(sim_time/dT)
     else  
         cur_psi_360 = cur_psi;
     end
-    
        
 
      % Set up sensor position (x,y) for each sensor for psi=0;
@@ -90,7 +95,8 @@ for outer_loop = 1:(sim_time/dT)
     sensorAngle = [cur_psi; cur_psi - pi/2];
       
     
-    % Create each sensor:
+    % Create the sensors:
+    sensorData={};
     for i=1:size(sensors,1)
         % rotation matrix isnt needed for now as sensors are at robot
         % centre
@@ -98,23 +104,45 @@ for outer_loop = 1:(sim_time/dT)
 %       sensors(i,:) = transpose(([cos(cur_psi), -sin(cur_psi);sin(cur_psi), cos(cur_psi)]*sensors(i,:)'));
        pose = [sensors(i,:)];
        
-       [obstacleMap,scan(i),distance(i,:),objectDetected(i)]=lidarSensor(obstacleMap,pose,sensorAngle(i));
-    end
-    if distance(1,3) < 1
-        fprintf('Object too close! At %.2f m\n',distance(1));
+       [ranges, angles] = obsSensor([pose, sensorAngle(i)], obstacleMap);
+        insertRay(estimatedMap, [pose, sensorAngle(i)], ranges, angles, ...
+        obsSensor.Range(end));
+       sensorData.Sensor{i}=[ranges, angles];
+       
     end
 
 %-------------------------------------------------------------------------%
 % Behavior
 %
- position = [cur_y,cur_x];
-[desired_psi,state,stopRobot,originalPosition]=wallFollowing_lidar(objectDetected,...
-    state,cur_psi,desired_psi,position,originalPosition,distance);  
 
-% [at_waypoint, desired_psi] = los_auto(cur_x,cur_y,desired_coord,point);  
-% if at_waypoint == 1
-%     stopRobot=1;
-% end
+% If check for goal is true check if the direct path to the goal is clear.
+if check_for_goal == 1 
+    check_for_goal = 0;
+    stopRobot = 0;
+    [at_waypoint, desired_psi] = los_auto(cur_x,cur_y,goal);
+    path = [cur_y cur_x 0;[goal(2) goal(1)] 0];
+    validator = validatorOccupancyMap;
+    validator.Map = obstacleMap;
+    validator.ValidationDistance = 0.01;
+    if isStateValid(validator,path)
+        startStates = path(1,:);
+        endStates = path(2,:);
+        [isPathValid] = isMotionValid(validator,startStates,endStates);
+    end
+    if at_waypoint == 1
+        stopRobot=1;
+        break;
+    end
+% else if the path is valid, continue on path
+elseif isPathValid == 1
+    a;
+% otherwise switch to wall-following:
+else
+    position = [cur_y,cur_x];
+     [desired_psi,state,stopRobot,originalPosition,check_for_goal]=wallFollowing_updated_2(objectDetected,...
+         state,cur_psi,desired_psi,position,originalPosition,distance,check_for_goal,scan);  
+end
+
 %-------------------------------------------------------------------------%    
 
     %---------------------------------------------------------------------%
@@ -144,7 +172,7 @@ for outer_loop = 1:(sim_time/dT)
     if stopRobot == 1 || abs(err_psi(n)) > 0.1
         desired_vel = 0;
     else
-        [desired_vel] = getVelocity(desired_coord(point,:),cur_x,cur_y);
+        [desired_vel] = getVelocity(goal,cur_x,cur_y);
     end
     % store desired velocity throughout simulation for later plotting
     desired_velocity(n) = desired_vel;
@@ -238,7 +266,7 @@ end
 %----------------------------------------------%
 % Plot which points the robot reached
 figure(1);
-for i=1:1:size(desired_coord,1)
+for i=1:1:size(goal,1)
    % plot(robot_path(i,2),robot_path(i,1),'-x');
     plot(xio(:,20)+5,xio(:,19)+5,'k');
 end

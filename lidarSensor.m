@@ -13,13 +13,13 @@ scan = lidarScan(ranges,angles);
 minRange = 0;
 maxRange = 1;
 % min and max angles are with relation to the pose angle (not global angle)
-minAngle = -pi/12;
-maxAngle = pi/12;
+minAngle = -pi/16;
+maxAngle = pi/16;
 
 scan = removeInvalidData(scan,'RangeLimits',[minRange maxRange],...
     'AngleLimits',[minAngle maxAngle]);
 % rotate the scan to match robot model frame of reference
-scan = transformScan(scan,[0,0,sensorAngle-pi/2]);
+%scan = transformScan(scan,[0,0,sensorAngle-pi/2]);
 if scan.Count ~= 0 
     objectDetected = 1;
     distanceLeft = sqrt(scan.Cartesian(1,1).^2 + scan.Cartesian(1,2).^2);

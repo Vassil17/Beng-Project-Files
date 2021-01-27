@@ -46,6 +46,7 @@ while size(openList,2) > 0
     
     % Generate the adjacent squares:
     adjacentNodes = [0 1;1 1;1 0;1 -1;0 -1;-1 -1; -1 0; -1 1];
+    
     for i=1:8
        newPosition = currentNode.position + adjacentNodes(i,:);
        % need a check if it's in the range:
