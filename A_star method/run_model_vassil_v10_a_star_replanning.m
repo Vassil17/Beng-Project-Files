@@ -1,4 +1,4 @@
-% Version 7 - LIDAR
+% Version 10 A* with re-planning;
 %
 %
 %
@@ -48,14 +48,14 @@ resolution = 10;
 obstacleMap = binaryOccupancyMap(max_x,max_y,resolution);
 estimatedMap = binaryOccupancyMap(max_x,max_y,resolution);
 
-wall{1} = WallGeneration1(0,7,6,6,'h');
+wall{1} = WallGeneration1(0,7.5,6,6,'h');
 wall{2} = WallGeneration1(3,10,7,7,'h');
 wall{3} = WallGeneration1(2,2,6,8,'v');
 wall{4} = WallGeneration1(2,8,8,8,'h');
 wall{5} = WallGeneration1(3,9,4,4,'h');
 wall{6} = WallGeneration1(2,2,2,5,'v');
 wall{7} = WallGeneration1(0,2,5,5,'h');
-wall{8} = WallGeneration1(8,10,5,5,'h');
+wall{8} = WallGeneration1(9,10,5,5,'h');
 wall{9} = WallGeneration1(3,3,2,4,'v');
 wall{10} = WallGeneration1(3,5,5,5,'h');
 wall{11} = WallGeneration1(5,5,5,6,'v');
@@ -76,7 +76,7 @@ for counter=1:length(wall)
     setOccupancy(estimatedMap, [x y], ones(i,1));
 end
 object{1} = WallGeneration1(6,6,4,5,'v');
-object{2} = WallGeneration1(7,7,5,6,'v');
+object{2} = WallGeneration1(7.5,7.5,5,6,'v');
 for counter=1:length(object)
     clear x; clear y;
     for i=1:length(object{counter})
@@ -121,23 +121,12 @@ for outer_loop = 1:(sim_time/dT)
     sensorAngle = [cur_psi; cur_psi - pi/2];
       
     
-%     % Create each sensor:
-%     for i=1:size(sensors,1)
-%         % rotation matrix isnt needed for now as sensors are at robot
-%         % centre
-% %       % use rotation matrix to find sensor position based on heading
-% %       sensors(i,:) = transpose(([cos(cur_psi), -sin(cur_psi);sin(cur_psi), cos(cur_psi)]*sensors(i,:)'));
-%        pose = [sensors(i,:)];
-%        
-%        [obstacleMap,scan(i),distance(i,:),objectDetected(i)]=lidarSensor(obstacleMap,pose,sensorAngle(i));
-%     end
-
-    
-    
 
 %-------------------------------------------------------------------------%
 % Behavior - A* pathplanning
 %
+% Save current cputime
+startTime = cputime;
 % Initially, create the plan:
     
     if current_point == 0
@@ -174,7 +163,7 @@ for outer_loop = 1:(sim_time/dT)
         if any(checkOccupancy(estimatedMap,poses_inverted(:,1:2)))
             current_point = 1;
             validator.Map = estimatedMap;
-            planner = plannerHybridAStar(validator,'MinTurningRadius',0.64);
+            planner = plannerHybridAStar(validator,'MinTurningRadius',0.64,'ReverseCost',6);
             % Create plan
             path = plan(planner,[cur_y cur_x cur_psi],goal_path);
             % Create points for robot to follow
@@ -210,7 +199,8 @@ for outer_loop = 1:(sim_time/dT)
         end
         end
     end
-
+  % Save cputime again to see how long the planning took; 
+  endTime = cputime - startTime; 
 %
 %
 %-------------------------------------------------------------------------%    
@@ -319,21 +309,17 @@ for outer_loop = 1:(sim_time/dT)
     %----------------------------------------------%
     
     %----------------------------------------------%
+
     figure(1);
     clf; show(obstacleMap);
     grid on; hold on;
     drawrobot(0.2,xi(20)+5,xi(19)+5,xi(24),'b');
     plot(goal(1),goal(2),'-o');
-    for i=1:size(poses,1)
-       plot(poses(:,2),poses(:,1),'-x');
+    for i=1:20:size(poses,1)
+       plot(poses(:,2),poses(:,1));
     end
-%     for i=1:length(sensors)
-%         drawSensorCone(sensorAngle(i),xi(19)+sensors(i,1),xi(20)+sensors(i,2),1);
-%     end
-%    xlabel('x, m'); ylabel('y, m');  
-%     for counter=1:length(wall)
-%         plot(wall{counter}(:,1),wall{counter}(:,2),'k-');   
-%     end
+    
+
     pause(0.001);
     %----------------------------------------------%
     

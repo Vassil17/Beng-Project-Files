@@ -267,16 +267,9 @@ for outer_loop = 1:(sim_time/dT)
     clf; show(obstacleMap);grid on; hold on;
     drawrobot(0.2,xi(20)+5,xi(19)+5,xi(24),'b');
     plot(goal(1),goal(2),'-o');
-    for i=1:size(endPoses,1)
-       plot(endPoses(i,1),endPoses(i,2),'-x');
+    for i=1:1:size(endPoses,1)
+       plot(endPoses(:,1),endPoses(:,2));
     end
-%     for i=1:length(sensors)
-%         drawSensorCone(sensorAngle(i),xi(19)+sensors(i,1),xi(20)+sensors(i,2),1);
-%     end
-%    xlabel('x, m'); ylabel('y, m');  
-%     for counter=1:length(wall)
-%         plot(wall{counter}(:,1),wall{counter}(:,2),'k-');   
-%     end
     pause(0.001);
     %----------------------------------------------%
     
