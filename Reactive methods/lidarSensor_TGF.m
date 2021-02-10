@@ -1,8 +1,14 @@
-function [obstacleMap,scan,distance,objectDetected]=lidarSensor_EG(obstacleMap,pose,range)
-% for EG use global LIDAR angle (i.e. always at angle pi/2 which is 0 on
-% this model)
-sensorAngle = 0; %pi/2
-pose = [pose sensorAngle];
+function [obstacleMap,scan,distance,objectDetected]=lidarSensor_TGF(obstacleMap,pose,range,cur_psi)
+% 
+% % Convert cur_psi which is in robot model notation to the standard notation 
+% % (0 to 2pi ccw) starting at horizontal;
+% if cur_psi < 0
+%     cur_psi = cur_psi - 2*pi;
+% end
+% % Then add pi/2 as in robot model notation 0 angle is at vertical
+% cur_psi = cur_psi + pi/2;
+% %
+pose = [pose 0];
 % create a range sensor
 rbsensor = rangeSensor;
 [ranges,angles] = rbsensor(pose,obstacleMap);

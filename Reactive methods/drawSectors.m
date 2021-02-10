@@ -1,5 +1,5 @@
-function []=drawSectors(angle,cur_x,cur_y,sector,K,i,Rright,Rleft,tenacity)
-R=2; % radius of 2m
+function []=drawSectors(angle,cur_x,cur_y,sector,K,i,Rright,Rleft,tenacity,range)
+R=range; % radius of scan
 %angle = angle+pi/2;
 % cone width is 10 degrees, but for two sensors so from -10 to +10 degrees
 start = angle; 

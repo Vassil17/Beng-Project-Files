@@ -19,8 +19,8 @@ point = 1;
 xi = zeros(1,24); % initial state for x
 % define starting position (in original coordinates, i.e. subtract 5 from
 % map coordinates)
-xi(19) = 0;
-xi(20) = -3;
+xi(19) = 2;
+xi(20) = -4;
 LeftS = 0;
 RightS = 0;
 err_psi_i(1) = 0;
@@ -33,6 +33,9 @@ originalPosition = 0;
 check_for_goal = 0;
 isPathValid = 0;
 go_to_goal = 0;
+%
+% LiDAR Range
+range = 5;
 % This section is to create the sector distribution of the LiDAR scan
 K=24;
 environment = struct;
@@ -56,11 +59,11 @@ resolution = 10;
 obstacleMap = binaryOccupancyMap(max_x,max_y,resolution);
 
 
-wall{1} = WallGeneration1(0,7,8,8,'h');
+wall{1} = WallGeneration1(0,2,8,8,'h');
 %wall{2} = WallGeneration1(3,10,8,8,'h');
 wall{2} = WallGeneration1(0,0,6,8,'v');
 wall{3} = WallGeneration1(7,7,6,8,'v');
-% wall{4} = WallGeneration1(2,8,8,8,'h');
+wall{4} = WallGeneration1(4,7,8,8,'h');
 % wall{5} = WallGeneration1(3,9,4,4,'h');
 % wall{6} = WallGeneration1(2,2,2,5,'v');
 % wall{7} = WallGeneration1(0,2,5,5,'h');
@@ -110,7 +113,7 @@ for outer_loop = 1:(sim_time/dT)
        
 % Run LiDAR sensor
        pose = [cur_y cur_x];
-       [obstacleMap,scan,distance,objectDetected]=lidarSensor_EG(obstacleMap,pose);
+       [obstacleMap,scan,distance,objectDetected]=lidarSensor_EG(obstacleMap,pose,range);
      
 
 
@@ -316,7 +319,7 @@ desired_psi = desired_psi + pi/2;
     % draw the sectors 
 
         for i=1:1:K
-        drawSectors(environment.angle(i),cur_x,cur_y,environment.sector(i),K,i,Rright,Rleft,tenacity)
+        drawSectors(environment.angle(i),cur_x,cur_y,environment.sector(i),K,i,Rright,Rleft,tenacity,range)
         end
 
     pause(0.001);
