@@ -82,13 +82,12 @@ else
        gap(gapNumber).Sides(2,:) =[x_i(end) y_i(end) SideAngle(2)];
        index = find(abs(gap(gapNumber).Sides(:,3))==min(abs(SideAngle(1)),abs(SideAngle(2))));
        gap(gapNumber).ClosestGapAngle = gap(gapNumber).Sides(index,3);
-       gap(gapNumber).AngleDifference = abs(cur_psi -angleToGoal - gap(gapNumber).ClosestGapAngle);
+       gap(gapNumber).AngleDifference = abs((cur_psi - angleToGoal) - gap(gapNumber).ClosestGapAngle);
     end
     % Angle to the goal should be relative to current heading:
     relativeAngleToGoal = cur_psi - angleToGoal;
     % Find which gap has the smallest angle to the goal
     closestGap = find([gap.AngleDifference] == min([gap.AngleDifference]));
-
     % Theta_cs is the closest gap side angle
     theta_cs = gap(closestGap).ClosestGapAngle;
 
