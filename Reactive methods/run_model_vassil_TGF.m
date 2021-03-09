@@ -12,7 +12,6 @@ clc;
 
 %----------------------------------------------%
 % Setup Simulation
-goal = [9 2];
 sim_time = 200;
 dT = 0.05;
 point = 1;
@@ -26,16 +25,12 @@ RightS = 0;
 err_psi_i(1) = 0;
 err_vel_i(1) = 0;
 stopRobot = 0;
-state = 1;
 desired_psi = 0;
 desired_psi_360=0;
-originalPosition = 0;
-check_for_goal = 0;
-isPathValid = 0;
-go_to_goal = 0;
 terminate = 0;
+%
 % LiDAR Range
-range = 10;
+range = 3;
 
 %----------------------------------------------%
 
@@ -44,37 +39,15 @@ range = 10;
 max_x = 10;
 max_y = 10;
 resolution = 10;
-% Create the obstacle map
-obstacleMap = binaryOccupancyMap(max_x,max_y,resolution);
+% Choose scenario (start and goal defined in scenarios)
+scenario = 1;
 
+[obstacleMap,start,goal]=mapEnvironments(resolution,scenario);
+xi(19) = start(1) - 5;
+xi(20) = start(2) - 5;
 
-wall{1} = WallGeneration1(0,2,8,8,'h');
-%wall{2} = WallGeneration1(3,10,8,8,'h');
-wall{2} = WallGeneration1(0,0,6,8,'v');
-wall{3} = WallGeneration1(7,7,6,7,'v');
-wall{4} = WallGeneration1(4,7,8,8,'h');
-wall{5} = WallGeneration1(0,7,6,6,'h');
-
-% wall{6} = WallGeneration1(2,2,2,5,'v');
-% wall{7} = WallGeneration1(0,2,5,5,'h');
-% wall{8} = WallGeneration1(9,10,5,5,'h');
-% wall{9} = WallGeneration1(3,3,2,4,'v');
-% wall{10} = WallGeneration1(9,9,4,5,'v');
-% wall{11} = WallGeneration1(0,0,5,6,'v');
-% wall{12} = WallGeneration1(10,10,5,8,'v');
-
-for counter=1:length(wall)
-    clear x; clear y;
-    for i=1:length(wall{counter})
-        x(i) = wall{counter}(i,1);
-        y(i) = wall{counter}(i,2);        
-    end
-    x=x.';
-    y=y.';
-
-    setOccupancy(obstacleMap, [x y], ones(i,1)) 
-
-end
+% Store the current location and heading for later plotting
+plotStorage(1,:) = [start(2) start(1) xi(24)];
 
 %-----------------------------------------------------------------------%
 tic;
@@ -120,12 +93,13 @@ if at_waypoint == 1
     break;
 end 
 
-[psi_sg,psi_vg,subgoal,virtgoal]=TGF_algorithm(scan,cur_x,cur_y,angleToGoal,goal,cur_psi);
+%[psi_sg,psi_vg,subgoal,virtgoal]=TGF_algorithm(scan,cur_x,cur_y,angleToGoal,goal,cur_psi);
+[psi_sg,psi_vg,subgoal,virtgoal,gap,closestGap]=TGF_algorithm(obstacleMap,...
+    scan,cur_x,cur_y,angleToGoal,goal,cur_psi);
 % psi_sg and psi_vg are in the algorithm FoR so need to convert back to the
 % model one (i.e. just switch the signs around):
 psi_sg = -psi_sg;
 psi_vg = -psi_vg;
-% NEED TO DEFINE POSITIONS FOR SUBGOAL AND VIRTUAL GOAL
 [~,desired_psi] = los_auto(cur_x,cur_y,virtgoal);
 %-------------------------------------------------------------------------%    
 
@@ -233,27 +207,53 @@ psi_vg = -psi_vg;
     %----------------------------------------------%
     
     %----------------------------------------------%
+if mod(outer_loop,100) == 0
+   plotStorage(end+1,:) =  [xi(20)+5 xi(19)+5 xi(24)];
+end
+%---------------------------------------------%
     figure(1);
     clf; show(obstacleMap);grid on; hold on;
     xlabel('X position [m]');
     ylabel('Y position [m]');
     title('Map of the environment');
     drawrobot(0.2,xi(20)+5,xi(19)+5,xi(24),'b');
-    goalPlot(1) = plot(goal(2),goal(1),'Marker','x','MarkerFaceColor','black',...
+    goalPlot(1) = plot(start(2),start(1),'Marker','x','MarkerFaceColor','yellow',...
         'LineWidth',1.5,'MarkerSize',10);
-    goalPlot(2) = plot(subgoal(2),subgoal(1),'Marker','x','MarkerFaceColor','blue',...
+    goalPlot(2) = plot(goal(2),goal(1),'Marker','x','MarkerFaceColor','black',...
         'LineWidth',1.5,'MarkerSize',10);
-    goalPlot(3) = plot(virtgoal(2),virtgoal(1),'Marker','x','MarkerFaceColor','red',...
-        'LineWidth',1.5,'MarkerSize',10);
+%     plot(subgoal(2),subgoal(1),'Marker','x','MarkerFaceColor','blue',...
+%          'LineWidth',1.5,'MarkerSize',10);
+%     plot(virtgoal(2),virtgoal(1),'Marker','x','MarkerFaceColor','red',...
+%          'LineWidth',1.5,'MarkerSize',10);
+   
+    % plot the gaps:
+    if isfield(gap,"Gap")
+        for k=1:1:size(gap,2)
+            if k==closestGap
+               plot(gap(k).Coordinates(:,1),gap(k).Coordinates(:,2),'g');
+            else
+                if gap(k).Gap == 1
+                     plot(gap(k).Coordinates(:,1),gap(k).Coordinates(:,2),'r');
+                end
+            end
+        end
+    end
+    % plot the scan range
+   % goalPlot(3) = viscircles([cur_y,cur_x],range,'Color','b','LineStyle','--');
     pause(0.001);
+    
     %----------------------------------------------%
     
 end
 %----------------------------------------------%
 % Plot which points the robot reached
 figure(1);
-trajectory = plot(xio(:,20)+5,xio(:,19)+5,'k','LineWidth',2);
-legend([goalPlot trajectory],{'Goal','SubGoal','VirtualGoal','Trajectory'}); 
+trajectory = plot(xio(:,20)+5,xio(:,19)+5,'k','LineStyle','--','LineWidth',2);
+trajectory.Color(4) = 0.25;
+for q = 1:size(plotStorage,1)
+drawrobot(0.2,plotStorage(q,1),plotStorage(q,2),plotStorage(q,3),'b');
+end
+legend([goalPlot(1:2) trajectory],{'Start','Goal','Trajectory'}); 
 
 
 %----------------------------------------------%

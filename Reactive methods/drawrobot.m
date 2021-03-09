@@ -37,6 +37,7 @@ end_y=(sin(psi_rad)*(r_robot+0.02));
 
 % Draw robot
 % Draw circle
-plot((x_points+centre_x),(y_points+centre_y),colour,'HandleVisibility','off');
+plot((x_points+centre_x),(y_points+centre_y),colour,'LineWidth',1,'HandleVisibility','off');
 % Draw line
-line([centre_x,(end_y+centre_x)],[centre_y,(end_x+centre_y)],'color',colour,'HandleVisibility','off');
+line([centre_x,(end_y+centre_x)],[centre_y,(end_x+centre_y)],'color',...
+    colour,'LineWidth',1,'HandleVisibility','off');

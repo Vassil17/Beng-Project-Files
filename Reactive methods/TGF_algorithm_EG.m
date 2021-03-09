@@ -1,4 +1,5 @@
-function [psi_sg,psi_vg,subgoal,virtgoal]=TGF_algorithm_EG(scan,cur_x,cur_y,angleToGoal,goal,cur_psi,angleT2)
+function [psi_sg,psi_vg,subgoal,virtgoal,gap,closestGap]=TGF_algorithm_EG(obstacleMap,...
+    scan,cur_x,cur_y,angleToGoal,goal,cur_psi,angleT2)
 %
 % This function contains the modified Tangential gap flow algorithm (TGF*)
 % that is used by the Escape Gap algorithm. It searches for gaps between
@@ -20,9 +21,36 @@ terminate = 0;
 % R is robot radius and Ds is security zone for obstacle avoidance
 R = 0.1;
 Ds = R+0.1;
+counter = 0;
+% Angle to the goal should be relative to current heading:
+relativeAngleToGoal = cur_psi - angleToGoal;
+% Define three positions (top, middle and bottom of robot) to be used for
+% checking leaving condition
+pos = [cur_x-0.1 cur_y; cur_x cur_y; cur_x+0.1 cur_y];
 while ~terminate
     %
-    % forward search:
+    % The leaving condition checks each position and its direct path to the
+    % goal. The condition is only satisfied when all three paths are clear
+    for ii=1:1:3
+        start = pos(ii,:);
+        [directPath(:,1),directPath(:,2)]=straightLine(start,goal,50);
+        directPath = [directPath(:,2) directPath(:,1)];
+     if ~any(checkOccupancy(obstacleMap,directPath))
+         % if the path is clear for this position, add to counter
+         counter=counter+1;
+     end
+    end
+    % only when all three positions have a clear path satisfy the condition
+    if counter == 3
+         psi_sg = 0;
+         psi_vg = 0;
+         closestGap = 0;
+         terminate = 1;
+         continue;
+    end
+%     
+        
+% forward search:
     for index=1:1:length(scan.Angles)
         if index == length(scan.Angles)
              dist1 = scan.Cartesian(index,1) - scan.Cartesian(1,1);
@@ -33,6 +61,9 @@ while ~terminate
            dist2 = scan.Cartesian(index,2) - scan.Cartesian(index+1,2);
            gapAngle = abs(scan.Angles(index) - scan.Angles(index+1));
         end
+        if abs(gapAngle) > pi
+           gapAngle = 2*pi - gapAngle;  
+        end
         if gapAngle >= 0.1 || sqrt(dist1^2+dist2^2)>=0.5
             gap_start(i,:) = [scan.Cartesian(index,1) -scan.Cartesian(index,2)]...
                 + [cur_x cur_y];
@@ -42,11 +73,11 @@ while ~terminate
             angle_travelled(index) = Inf;
             % define a constraint for the angular distance travelled to be
             % less than pi
-            constraint = find(angle_travelled>=pi);
+            constraint = find(angle_travelled>=pi & angle_travelled~=angle_travelled(1));
             % Remove all entries that don't satisfy the constraint or whos
             % indices are smaller than index+1
             distance_gap(constraint) = Inf;
-            distance_gap(1:(index-1)) = Inf;
+            distance_gap(1:index-1) = Inf;
             % For the edge discontinuity look to the closest point that
             % satisfies the conditions and that is the gap
             if ~all(distance_gap == Inf)
@@ -61,10 +92,9 @@ while ~terminate
                  gap_start(i,:) = [];
             end
         end
-        
     end
     
-    % backward search
+% backward search
     for index=length(scan.Angles):-1:1
         if index == 1
              dist1 = scan.Cartesian(index,1) - scan.Cartesian(length(scan.Angles),1);
@@ -75,16 +105,19 @@ while ~terminate
            dist2 = scan.Cartesian(index,2) - scan.Cartesian(index-1,2);
            gapAngle = abs(scan.Angles(index) - scan.Angles(index-1));
         end
+        if abs(gapAngle) > pi
+           gapAngle = 2*pi - gapAngle;  
+        end
         if gapAngle >= 0.1 || sqrt(dist1^2+dist2^2)>=0.5
             gap_start(i,:) = [scan.Cartesian(index,1) -scan.Cartesian(index,2)]...
                 + [cur_x cur_y];
             distance_gap = sqrt((scan.Cartesian(:,1) - scan.Cartesian(index,1)).^2 ...
                 +(scan.Cartesian(:,2) - scan.Cartesian(index,2)).^2);
-            angle_travelled = abs(scan.Angles(:,1) - scan.Angles(index));
+            angle_travelled = abs(scan.Angles(index) - scan.Angles(:,1));
             angle_travelled(index) = Inf;
             % define a constraint for the angular distance travelled to be
             % less than pi
-            constraint = find(angle_travelled>=pi);
+            constraint = find(angle_travelled>=pi & angle_travelled~=angle_travelled(end));
             % Remove all entries that don't satisfy the constraint or whos
             % indices are smaller than index+1
             distance_gap(constraint) = Inf;
@@ -99,28 +132,22 @@ while ~terminate
                  gap_start(i,:) = [];
             end
         end
-     end
- 
+    end
+    
     if  i==1 % i.e. if there are no gaps
         psi_sg = 0;
-        psi_vg = 0;
-        terminate = 1;
-        break;
+        closestGap = 0;
+        noGaps = 1;
     else
         for gapNumber = 1:i-1
             
             
            y=[gap_start(gapNumber,1) gap_end(gapNumber,1)];
            x=[gap_start(gapNumber,2) gap_end(gapNumber,2)];
-           diff = x(2) - x(1);
-           if diff == 0
-              x(2) = x(1) + 0.01;
-              diff = x(2) - x(1);
-           end
-              x_i = x(1):(diff/10):x(2);
-
-           y_i = interp1(x,y,x_i,'linear');
-
+           start=[x(1),y(1)];
+           ending = [x(2),y(2)];
+           pts = 50;
+           [x_i,y_i]=straightLine(start,ending,pts);
  
            gap(gapNumber).Coordinates = [x_i' y_i'];
            gap(gapNumber).Width = sqrt((x_i(1)-x_i(end))^2 + (y_i(1)-y_i(end))^2);
@@ -162,15 +189,15 @@ while ~terminate
         end
         % Filter through the gapSpan to find which gap falls within another
         for k = 1:1:gapNumber
-         filterIndex = find(abs(gapSpan(k,1))>=abs(gapSpan(:,1)) & abs(gapSpan(k,2))>=abs(gapSpan(:,2)));
-         filterIndex = filterIndex';
-         clear coordinate;
-         for id = 1:length(filterIndex)
-          coordinate(id,:) = gap(filterIndex(id)).Centre;
-         end
-        distance = sqrt((cur_x - coordinate(:,2)).^2 + (cur_y - coordinate(:,1)).^2);
-
-        mainGap = find(distance == min(distance));
+%          filterIndex = find(abs(gapSpan(k,1))>=abs(gapSpan(:,1)) & abs(gapSpan(k,2))>=abs(gapSpan(:,2)));
+%          filterIndex = filterIndex';
+%          clear coordinate;
+%          for id = 1:length(filterIndex)
+%           coordinate(id,:) = gap(filterIndex(id)).Centre;
+%          end
+%         distance = sqrt((cur_x - coordinate(:,2)).^2 + (cur_y - coordinate(:,1)).^2);
+% 
+%         mainGap = find(distance == min(distance));
 %         if k ~= mainGap
 %            gap(k).Gap =0;
 %            continue;
@@ -180,31 +207,27 @@ while ~terminate
               gap(k).Gap =0;
               continue;
            else
-                   % 1 means gap is allowed
-                   gap(k).Gap = 1;
-                   plot(gap(k).Coordinates(:,1),gap(k).Coordinates(:,2),'HandleVisibility','off');
+               % 1 means gap is allowed
+               gap(k).Gap = 1;                  
            end
 %         end
         end
-        
-        
-        % Angle to the goal should be relative to current heading:
-        relativeAngleToGoal = cur_psi - angleToGoal;
-        % Find which gap has the smallest angle to the goal
+        % Delete gaps which are inaccessible
+        idx = find([gap.Gap] == 0);
+        gap(idx) = [];
+       
         
         %If there are no gaps, head straight to goal
         if ~all([gap.Gap]==0)
- %         closestGap = find([gap.AngleDifference] == min([gap.AngleDifference]));
+           noGaps = 0;
           closestGap  = find([gap.mindist] == min([gap.mindist]));
           %in case there are multiple gaps with the same angle difference,
           %choose the first one
           closestGap = min(closestGap);
-          noGaps=false;
         else
-          psi_sg = 0;
-          noGaps=true;
+          noGaps=1;
         end
-      if noGaps == false
+      if noGaps == 0
         % Theta_cs is the closest gap side angle
         theta_cs = gap(closestGap).ClosestGapAngle;
 
@@ -244,6 +267,7 @@ while ~terminate
              angleToTarget = relativeAngleToGoal;
          end
       end
+    end
          indx = find(scan.Ranges == min(scan.Ranges));
          dist = [scan.Cartesian(indx,1) -scan.Cartesian(indx,2)]+[cur_x cur_y];
          [~,globalBeta] = los_auto(cur_x,cur_y,[dist(1) dist(2)]);
@@ -269,7 +293,6 @@ while ~terminate
          elseif abs(beta)<abs(alpha) && sign(alpha)==sign(beta)
             psi_vg = sign(beta)*pi/2 - gamma;
          end
-    end
     terminate = 1;
 end
     % Need to rotate the vector to the goal by psi_sg for the subgoal and by
@@ -291,7 +314,7 @@ end
 %     goalT2 = [v_goalT2(2)+cur_x v_goalT2(1)+cur_y];
 %     % Rotate v_goal by psi_sg to obtain v_sg (subgoal)
 %     % But psi_sg is defined relative to current heading so convert:
-%     %psi_sg = cur_psi + psi_sg;
+    psi_sg = cur_psi + psi_sg;
     v_sg = [cos(psi_sg) -sin(psi_sg); sin(psi_sg) cos(psi_sg)]*v_goal;
     subgoal = [v_sg(2)+cur_x v_sg(1)+cur_y];
     % Then analogous with the virtual goal

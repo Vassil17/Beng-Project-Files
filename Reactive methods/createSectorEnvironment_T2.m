@@ -1,5 +1,14 @@
 function [environment,Rt,obstacle_storage]=createSectorEnvironment_T2(scan,...
-    K,angleToGoal,cur_x,cur_y,obstacle_storage)
+    K,angleToGoal,cur_x,cur_y,obstacle_storage,outer_loop)
+%
+%
+% This function creates the angular sector distribution of the sensor
+% radius of the robot used by the T2 algorithm. It also calculates where
+% previous obstacles would be in the current angular sector distribution,
+% storing them in short term memory.
+%
+%
+%
 % Split the circle around robot in K sectors and store them;
 % the direction should be in global angle;
 % start at negative angle so that the angle of the sector indicates its
@@ -37,22 +46,24 @@ for i=1:1:K
        % save the distance to the obstacle
        environment.distance(i) = min(scan.Ranges(findObjects));
        environment.sector(i) = "blocked";
+       if mod(outer_loop,20)==0
        % Check if short term memory already contains this sector
-       index = find(obstacle_storage.sector == i);
-       % If it exists, rewrite it
-       if ~isempty(index)
-           obstacle_storage.sector(index) =  i;
-           obstacle_storage.angle(index) = environment.angle(i);
-           obstacle_storage.distance(index) = environment.distance(i);
-           obstacle_storage.centre(index,:) = [cur_y cur_x];
-           blocked = 1;
-       else
+%       index = find(obstacle_storage.sector == i);
+%       % If it exists, rewrite it
+%        if ~isempty(index)
+%            obstacle_storage.sector(index) =  i;
+%            obstacle_storage.angle(index) = environment.angle(i);
+%            obstacle_storage.distance(index) = environment.distance(i);
+%            obstacle_storage.centre(index,:) = [cur_y cur_x];
+%            blocked = 1;
+%        else
            obstacle_storage.sector(end+1) =  i;
            obstacle_storage.angle(end+1) = environment.angle(i);
            obstacle_storage.distance(end+1) = environment.distance(i);
            obstacle_storage.centre(end+1,:) = [cur_y cur_x];
            blocked = 1;
-       end
+%        end
+       end % end mod
            
    end
    if angleToGoal - environment.angle(i) >=0 && angleToGoal - environment.angle(i) <=2*pi/K
@@ -87,6 +98,7 @@ if ~isempty(obstacle_storage.sector)
        % The difference should be between 0 and the angle size of each
        % sector (small tolerance added to skew it towards the next sector);
        newSector = find(diff>=-0.01 & diff<2*pi/K-1e-5);
+  %     newSector = find(abs(diff)<=2*pi/K);
        for sector=1:length(newSector)
             environment.sector(newSector(sector)) = 'blocked';
        end

@@ -8,7 +8,7 @@ function [obstacleMap,scan,distance,objectDetected]=lidarSensor_TGF(obstacleMap,
 % % Then add pi/2 as in robot model notation 0 angle is at vertical
 % cur_psi = cur_psi + pi/2;
 % %
-pose = [pose 0];
+pose = [pose pi/2];
 % create a range sensor
 rbsensor = rangeSensor;
 [ranges,angles] = rbsensor(pose,obstacleMap);

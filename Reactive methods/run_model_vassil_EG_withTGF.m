@@ -1,5 +1,9 @@
-% Version 11 - Reactive T2 / EG algorithm
-%
+% Version 11 - Reactive EG algorithm
+% 
+% This programme simulates a robot navigating its environment using a
+% reactive navigation algorithm, called Escape Gap (EG). Different
+% scenarios and environments can be tested and they are loaded up from the
+% mapEnvironments.m function. 
 %
 %
 % 
@@ -12,6 +16,7 @@ clc;
 
 %----------------------------------------------%
 % Setup Simulation
+goal = [9 6];
 sim_time = 500;
 dT = 0.05;
 point = 1;
@@ -25,14 +30,22 @@ RightS = 0;
 err_psi_i(1) = 0;
 err_vel_i(1) = 0;
 stopRobot = 0;
+state = 1;
 desired_psi = 0;
 desired_psi_360=0;
+originalPosition = 0;
+check_for_goal = 0;
+isPathValid = 0;
+go_to_goal = 0;
 %
-% LiDAR Range
+% LiDAR Range for T2 algorithm
 range = 1;
+% LiDAR Range for TGF algorithm
+rangeTGF = 3;
 % This section is to create the sector distribution of the LiDAR scan
 K=24;
-environment = struct;
+layer = struct;
+layer.environment=[];
 % Initiate the obstacle_storage structure
 obstacle_storage = struct;
 obstacle_storage.sector = [];
@@ -40,9 +53,14 @@ obstacle_storage.angle = [];
 obstacle_storage.distance = [];
 obstacle_storage.centre = [];
 % set tenacity (0 for left, 1 for right)
-tenacity = 0;
+tenacity = 1;
 % set terminate to 0
 terminate = 0;
+% Initially the active activeLayer is the first (and only) one
+activeLayer = 1;
+layerChanged = 0;
+% getMode 1 corresponds to MTT, 2 corresponds to BF (explained below).
+getMode = 1;
 %
 %----------------------------------------------%
 
@@ -52,22 +70,18 @@ max_x = 10;
 max_y = 10;
 resolution = 10;
 % Choose scenario (start and goal defined in scenarios)
-scenario = 5;
+scenario = 1;
 
 [obstacleMap,start,goal]=mapEnvironments(resolution,scenario);
 xi(19) = start(1) - 5;
 xi(20) = start(2) - 5;
 
-% Store the current location and heading for later plotting
-plotStorage(1,:) = [start(2) start(1) xi(24)];
-sectorPlotStorage = [];
-% Dummy variable to count sectorPlotStorage
-qq = 0;
 %-----------------------------------------------------------------------%
 tic;
 %----------------------------------------------%
 
 for outer_loop = 1:(sim_time/dT)
+    step = outer_loop;
     if terminate == 1
         break;
     end
@@ -95,11 +109,11 @@ for outer_loop = 1:(sim_time/dT)
 % Run LiDAR sensor
        pose = [cur_y cur_x];
        [obstacleMap,scan,distance,objectDetected]=lidarSensor_T2(obstacleMap,pose,range);
-     
+       [~,scanTGF]=lidarSensor_TGF(obstacleMap,pose,rangeTGF,cur_psi);
 
 
 %-------------------------------------------------------------------------%
-% Navigation Section
+% Behavior
 %
 %
 % check the angle to the goal
@@ -109,25 +123,29 @@ if at_waypoint == 1
 end 
 % run script to plot the sector distribution and obtain target path sector
 % Rt
-[environment,Rt,obstacle_storage] = createSectorEnvironment_T2(scan,K,angleToGoal,...
-    cur_x,cur_y,obstacle_storage,outer_loop);
+[layer,activeLayer,newLayer,prevEnvironment,...
+    Rt,obstacle_storage] = createSectorEnvironment_EG(layer,...
+    activeLayer,scan,K,angleToGoal, cur_x,cur_y,obstacle_storage,step);
 
-% if Rt sector is allowed choose it
-if strcmp(environment.sector(Rt),'allowed')
-    R = Rt;
-    % and erase the short term memory;
-    obstacle_storage.sector = [];
-    obstacle_storage.angle = [];
-    obstacle_storage.distance = [];
-    obstacle_storage.centre = [];
-else
-    % mark the Rt sector as allowed in order to search its neighbours
-    environment.sector(Rt) = 'allowed';
-    [R] = calculateR(Rt,environment,'allowed',tenacity,'T2');
-    environment.sector(Rt) = 'blocked';
+% If the mode is move to target (MTT), i.e. 1
+if getMode == 1
+    if strcmp(layer(activeLayer).environment.sector(Rt),'allowed') 
+        R = Rt;
+    else
+        getMode = 2; % otherwise set mode to 2, i.e boundary following (BF)
+    end
+    noLayer = 0;
 end
-
-desired_angle = environment.angle(R);
+if getMode == 2
+    [R,getMode,activeLayer,layer,noLayer] = followBoundary(layer,activeLayer,...
+    newLayer,prevEnvironment,Rt,tenacity,getMode);
+end
+% if the active layer was the first one and it was emptied -> go to next
+% loop
+if noLayer == 1
+   continue; 
+end
+ desired_angle = layer(activeLayer).environment.angle(R);
 
 % Convert back to the coordinate system of the model (-pi to 0 to pi)
 if desired_angle >= pi
@@ -136,15 +154,23 @@ elseif desired_angle < pi
     desired_psi = -desired_angle;
 end
 % Add pi/2 to shift the 0 to be on the vertical axis
-desired_psi = desired_psi + pi/2;
+angleT2 = desired_psi + pi/2;
+%desired_psi = angleT2;
+[psi_sg,psi_vg,subgoal,virtgoal,gap,closestGap]=TGF_algorithm_EG(obstacleMap,...
+    scanTGF,cur_x,cur_y,angleToGoal,goal,cur_psi,angleT2);
+% % psi_sg and psi_vg are in the algorithm FoR so need to convert back to the
+% % model one (i.e. just switch the signs around):
+psi_sg = -psi_sg;
+psi_vg = -psi_vg;
+[~,desired_psi] = los_auto(cur_x,cur_y,virtgoal);
 %-------------------------------------------------------------------------%    
-% Control Section
-%---------------------------------------------------------------------%
-% Once we've obtained the desired heading a controller needs to be
-% designed to feed appropriate voltages into the motors
-%
-% First calculate error err_psi between current and desired heading,
-% then error between current and desired distance
+
+    %---------------------------------------------------------------------%
+    % Once we've obtained the desired heading a controller needs to be
+    % designed to feed appropriate voltages into the motors
+    %
+    % First calculate error err_psi between current and desired heading,
+    % then error between current and desired distance
         
 % 
     if desired_psi < 0
@@ -241,64 +267,44 @@ desired_psi = desired_psi + pi/2;
     xdo(outer_loop,:) = xdot;
     xio(outer_loop,:) = xi;
     %----------------------------------------------%
-    % Plot the robot and sectors
+    
     %----------------------------------------------%
-    % refresh plot every X steps
-    if mod(outer_loop,5)==0
     figure(1);
     clf; show(obstacleMap);grid on; hold on;
     xlabel('X position [m]');
     ylabel('Y position [m]');
     title('Map of the environment');
     drawrobot(0.2,xi(20)+5,xi(19)+5,xi(24),'b');
-    % plot the goal point
-    goal_marker = plot(goal(2),goal(1),'Marker','x','MarkerFaceColor','black',...
-        'LineWidth',2,'MarkerSize',12);
-
-    % draw the sectors 
-    for i=1:1:K
-        drawSectors(environment.angle(i),cur_x,cur_y,environment.sector(i),K,i,R,range)
-    end
-    end
-    if qq ==0
-        qq=qq+1;
-        sectorPlotStorage(qq).env = environment;
-        sectorPlotStorage(qq).pos = [cur_x cur_y];
-        sectorPlotStorage(qq).R = R;
-        condition = 1;
-    else
-        condition = mod(outer_loop,100);
-    end
-    if condition == 0
-        qq = qq+1;
-        plotStorage(end+1,:) =  [xi(20)+5 xi(19)+5 xi(24)];
-        sectorPlotStorage(qq).env = environment;
-        sectorPlotStorage(qq).pos = [cur_x cur_y];
-        sectorPlotStorage(qq).R = R;
+%     goalPlot(1) = plot(goal(2),goal(1),'Marker','x','MarkerFaceColor','black',...
+%     'LineWidth',1.5,'MarkerSize',10);
+    pause(0.001);
+%     % draw the sectors 
+%         for i=1:1:K
+%         drawSectors(layer(activeLayer).environment.angle(i),cur_x,cur_y,layer(activeLayer).environment.sector(i),K,i,R,range)
+%         end
+ % plot the gaps:
+    if isfield(gap,"Gap")
+        for k=1:1:size(gap,2)
+            if k==closestGap
+               plot(gap(k).Coordinates(:,1),gap(k).Coordinates(:,2),'g');
+            else
+                if gap(k).Gap == 1
+                     plot(gap(k).Coordinates(:,1),gap(k).Coordinates(:,2),'r');
+                end
+            end
+        end
     end
     pause(0.001);
- %----------------------------------------------%
+    %----------------------------------------------%
     
 end
 
 %----------------------------------------------%
 % Plot which points the robot reached
 figure(1);
-trajectory = plot(xio(:,20)+5,xio(:,19)+5,'k','LineWidth',2);
-% for q = 1:size(plotStorage,1)
-% drawrobot(0.2,plotStorage(q,1),plotStorage(q,2),plotStorage(q,3),'b');
-% end
-% for cntr = 1:size(sectorPlotStorage,2)
-%     for k=1:K
-%         angle = sectorPlotStorage(cntr).env.angle(k);
-%         sector = sectorPlotStorage(cntr).env.sector(k);
-%         cur_x = sectorPlotStorage(cntr).pos(1);
-%         cur_y = sectorPlotStorage(cntr).pos(2);
-%         R = sectorPlotStorage(cntr).R;
-%         drawSectors(angle,cur_x,cur_y,sector,K,k,R,range)
-%     end
-% end
-legend([goal_marker,trajectory],{'Target','Path'});
+trajectory = plot(xio(:,20)+5,xio(:,19)+5,'k','LineStyle','--','LineWidth',2);
+trajectory.Color(4) = 0.25;
+%legend([goalPlot(1),trajectory],{'Target','Path'});
 
 %----------------------------------------------%
 toc;
