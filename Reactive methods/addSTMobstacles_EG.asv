@@ -43,7 +43,7 @@ if ~isempty(removeSTMdata)
     layer.obstacle_storage.sector(removeSTMdata) = [];
     layer.obstacle_storage.angle(removeSTMdata) = [];
     layer.obstacle_storage.distance(removeSTMdata) = [];
-    layer.obstacle_storage.centre(removeSTMdata,:) = [];
+    layer.obstacle_storage.centre(removeSTMdata) = [];
 end
 
 end

@@ -1,9 +1,9 @@
 function [R,getMode,activeLayer,layer,noLayer,removefromSTM] = followBoundary(layer,activeLayer,...
     prevEnvironment,Rt,tenacity,getMode,prevRt,sensorData,scan,angleToGoal,...
-    K,outer_loop,cur_x,cur_y,removefromSTM)
+    K,outer_loop,cur_x,cur_y)
 % This function returns the angular region in which the robot should move
 % when following a boundary
-
+removefromSTM = [];
 % Change the direction of searches depending on tenacity
 if tenacity == 1
     searchA = 1; %clockwise
@@ -80,7 +80,7 @@ if MAINCND
     R=Rt;   
     % and obtain new sensorData:
     [~,sensorData]=createSectorEnvironment_EG_v2(layer,activeLayer,scan,...
-    K,angleToGoal,cur_x,cur_y,outer_loop,removefromSTM);
+    K,angleToGoal,cur_x,cur_y,outer_loop);
 elseif ~MAINCND && strcmp(layer(activeLayer).environment.sector(Rt),'blocked') 
     % mark the Rt sector as allowed in order to search its neighbours
     layer(activeLayer).environment.sector(Rt) = 'allowed';

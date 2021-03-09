@@ -1,6 +1,6 @@
 function [layer,sensorData,activeLayer,...
-    prevEnvironment,Rt,prevRt,removefromSTM]=createSectorEnvironment_EG_v2(layer,activeLayer,scan,...
-    K,angleToGoal,cur_x,cur_y,outer_loop,removefromSTM)
+    prevEnvironment,Rt,prevRt]=createSectorEnvironment_EG_v2(layer,activeLayer,scan,...
+    K,angleToGoal,cur_x,cur_y,outer_loop)
 
 % This function creates the angular sector distribution of the sensor
 % radius of the robot used by the EG algorithm. It also calculates where
@@ -55,7 +55,7 @@ for i=1:1:K
        layer(activeLayer).environment.distance(i) = min(scan.Ranges(findObjects));
        layer(activeLayer).environment.sector(i) = "blocked";
    % Store the obstacles every X steps of the simulation
-   if mod(outer_loop,50) == 0
+   if mod(outer_loop,20) == 0
        layer(activeLayer).obstacle_storage.sector(end+1) =  i;
        layer(activeLayer).obstacle_storage.angle(end+1) = layer(activeLayer).environment.angle(i);
        layer(activeLayer).obstacle_storage.distance(end+1) = layer(activeLayer).environment.distance(i);
@@ -73,19 +73,19 @@ layer(activeLayer).environment.centre = [cur_y cur_x];
 if ~exist('Rt','var')
    Rt=NaN;
 end
-%%%%%%
-removeData = [];
-if exist('removefromSTM','var') && ~isempty(removefromSTM)
-    for p=1:length(removefromSTM)
-        sector = removefromSTM(p);
-        if strcmp(layer(activeLayer).environment.sector(sector),'blocked')
-            removeData(end+1) = p;
-        end
-    end
-end
-if ~isempty(removeData)
-    removefromSTM(removeData) = [];
-end
+% %%%%%%
+% removeData = [];
+% if exist('removefromSTM','var') && ~isempty(removefromSTM)
+%     for p=1:length(removefromSTM)
+%         sector = removefromSTM(p);
+%         if strcmp(layer(activeLayer).environment.sector(sector),'blocked')
+%             removeData(end+1) = p;
+%         end
+%     end
+% end
+% if ~isempty(removeData)
+%     removefromSTM(removeData) = [];
+% end
 layer(activeLayer).environment.Rt = Rt;
 % If the prevEnvironment wasn't assigned (i.e. at first loop or when the
 % layer has been cleaned), assign it

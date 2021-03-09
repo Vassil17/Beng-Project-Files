@@ -128,8 +128,8 @@ end
 % run script to plot the sector distribution and obtain target path sector
 % Rt
 [layer,sensorData,activeLayer,prevEnvironment,...
-    Rt,prevRt,removefromSTM] = createSectorEnvironment_EG_v2(layer,...
-    activeLayer,scan,K,angleToGoal, cur_x,cur_y,outer_loop,removefromSTM);
+    Rt,prevRt] = createSectorEnvironment_EG_v2(layer,...
+    activeLayer,scan,K,angleToGoal, cur_x,cur_y,outer_loop);
 %
 %
 % Add the obstacles from Short term memory (STM):
@@ -150,7 +150,7 @@ end
 if getMode == 2
    [R,getMode,activeLayer,layer,noLayer,removefromSTM] = followBoundary(layer,activeLayer,...
     prevEnvironment,Rt,tenacity,getMode,prevRt,sensorData,scan,...
-    angleToGoal,K,outer_loop,cur_x,cur_y,removefromSTM);
+    angleToGoal,K,outer_loop,cur_x,cur_y);
 
 end
 % if the active layer was the first one and it was emptied -> go to next
@@ -158,8 +158,8 @@ end
 if noLayer == 1
     % create new environment
     [layer,sensorData,activeLayer,prevEnvironment,...
-    Rt,prevRt,removefromSTM] = createSectorEnvironment_EG_v2(layer,...
-    activeLayer,scan,K,angleToGoal, cur_x,cur_y,outer_loop,removefromSTM);
+    Rt,prevRt] = createSectorEnvironment_EG_v2(layer,...
+    activeLayer,scan,K,angleToGoal, cur_x,cur_y,outer_loop);
     desired_angle = layer(activeLayer).environment.angle(Rt);
 else
  desired_angle = layer(activeLayer).environment.angle(R);
@@ -324,7 +324,7 @@ end
 % Plot which points the robot reached
 figure(1);
 trajectory = plot(xio(:,20)+5,xio(:,19)+5,'k','LineStyle','--','LineWidth',2);
-trajectory.Color(4) = 0.25;
+trajectory.Color(4) = 0.5;
 legend([goalPlot(1),trajectory],{'Target','Path'});
 
 %----------------------------------------------%
