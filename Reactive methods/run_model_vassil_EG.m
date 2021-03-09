@@ -33,11 +33,13 @@ err_vel_i(1) = 0;
 stopRobot = 0;
 state = 1;
 desired_psi = 0;
+desired_vel = 0;
 desired_psi_360=0;
 originalPosition = 0;
 check_for_goal = 0;
 isPathValid = 0;
 go_to_goal = 0;
+step=0;
 %
 % LiDAR Range for T2 algorithm
 range = 1;
@@ -85,7 +87,6 @@ tic;
 %----------------------------------------------%
 
 for outer_loop = 1:(sim_time/dT)
-    step = outer_loop;
     if terminate == 1
         break;
     end
@@ -98,8 +99,20 @@ for outer_loop = 1:(sim_time/dT)
     cur_y = xi(20)+5;
     cur_psi = xi(24);
     cur_vel = xi(13);
-    n = outer_loop;
-
+    
+    if abs(desired_psi - cur_psi)>0.1 
+        step = step+1;
+    elseif abs(desired_vel - cur_vel)>0.1
+        step = step+1;
+    else
+        % when the desired heading and velocity have been achieved clear the PID
+        % controller
+        step=1;
+        clear u_psi u_vel err_psi err_psi_d err_psi_i err_vel err_vel_d err_vel_i;
+        err_psi_i(step) = 0;
+        err_vel_i(step) = 0;
+    end
+    
     % Change heading to be from 0 to 360 degrees   
 
     if cur_psi < 0 
@@ -200,21 +213,21 @@ desired_psi = angleT2;
     end
    
     
-    err_psi(n) = desired_psi_360 - cur_psi_360;
+    err_psi(step) = desired_psi_360 - cur_psi_360;
     % error shouldn't be bigger than 180 degrees:
-    if abs(err_psi(n)) > pi
-        err_psi(n)=-sign(err_psi(n))*(2*pi-abs(err_psi(n)));
+    if abs(err_psi(step)) > pi
+        err_psi(step)=-sign(err_psi(step))*(2*pi-abs(err_psi(step)));
     end
     % If robot has been told to stop or heading is 0, set vel to 0
-    if stopRobot == 1 || abs(err_psi(n)) > 0.1
+    if stopRobot == 1 || abs(err_psi(step)) > 0.1
         desired_vel = 0;
     else
         [desired_vel] = getVelocity(goal,cur_x,cur_y);
     end
     % store desired velocity throughout simulation for later plotting
-    desired_velocity(n) = desired_vel;
+  %  desired_velocity(step) = desired_vel;
     
-    err_vel(n) = desired_vel - cur_vel;
+    err_vel(step) = desired_vel - cur_vel;
 %---------------------------------------------------------------------%
         
     % PID Controllers for heading and velocity:
@@ -227,35 +240,35 @@ desired_psi = angleT2;
     Ki_vel = 35;   %70
     Kd_vel = .01;  %.01
 
-    if n == 1
-        prev_n = 1;
+    if step == 1
+        prevStep = 1;
     else
-        prev_n = n-1;
+        prevStep = step-1;
     end
     % For error in psi:
     %
     % Using Euler's backward rule
-    err_psi_i(n) = err_psi_i(prev_n)  + err_psi(n)*dT; 
-    err_psi_d(n) = (err_psi(n) - err_psi(prev_n))/dT;
+    err_psi_i(step) = err_psi_i(prevStep)  + err_psi(step)*dT; 
+    err_psi_d(step) = (err_psi(step) - err_psi(prevStep))/dT;
 
-    u_psi(n) = Kp_psi * err_psi(n) + Ki_psi * err_psi_i(n) +...
-        + Kd_psi * err_psi_d(n) ;
+    u_psi(step) = Kp_psi * err_psi(step) + Ki_psi * err_psi_i(step) +...
+        + Kd_psi * err_psi_d(step) ;
     %
     %
     % For error in velocity:
-    err_vel_i(n) = err_vel_i(prev_n)  + err_vel(n)*dT;
-    err_vel_d(n) = (err_vel(n) - err_vel(prev_n))/dT;
+    err_vel_i(step) = err_vel_i(prevStep)  + err_vel(step)*dT;
+    err_vel_d(step) = (err_vel(step) - err_vel(prevStep))/dT;
 
-    u_vel(n) = Kp_vel*err_vel(n)+Ki_vel*err_vel_i(n)+Kd_vel*err_vel_d(n);
+    u_vel(step) = Kp_vel*err_vel(step)+Ki_vel*err_vel_i(step)+Kd_vel*err_vel_d(step);
 %------------------------------------------------------------------%
 % Convert inputs into voltages:    
-    if abs(u_vel(n))> 12
-        u_vel(n) = sign(u_vel(n))*12;
+    if abs(u_vel(step))> 12
+        u_vel(step) = sign(u_vel(step))*12;
     end
 
 
-    Vl = (u_vel(n) + u_psi(n))/2;
-    Vr = (u_vel(n) - u_psi(n))/2;
+    Vl = (u_vel(step) + u_psi(step))/2;
+    Vr = (u_vel(step) - u_psi(step))/2;
 
 
     if Vl > 7.4 || Vl < -7.4
@@ -265,9 +278,9 @@ desired_psi = angleT2;
         Vr = sign(Vr)*7.4;
     end
 
-    
-     V_matrix(1,n) = Vl;
-     V_matrix(2,n) = Vr;
+%     
+%      V_matrix(1,n) = Vl;
+%      V_matrix(2,n) = Vr;
 
     %
     %
@@ -295,6 +308,8 @@ desired_psi = angleT2;
     title('Map of the environment');
     drawrobot(0.2,xi(20)+5,xi(19)+5,xi(24),'b');
      goalPlot(1) = plot(goal(2),goal(1),'Marker','x','MarkerFaceColor','black',...
+     'LineWidth',1.5,'MarkerSize',10);
+     goalPlot(2) = plot(xio(1,20)+5,xio(1,19)+5,'Marker','x','MarkerFaceColor','red',...
      'LineWidth',1.5,'MarkerSize',10);
     pause(0.001);
 %     % draw the sectors 
@@ -325,7 +340,7 @@ end
 figure(1);
 trajectory = plot(xio(:,20)+5,xio(:,19)+5,'k','LineStyle','--','LineWidth',2);
 trajectory.Color(4) = 0.5;
-legend([goalPlot(1),trajectory],{'Target','Path'});
+legend([goalPlot(1:2),trajectory],{'Target','Start','Path'});
 
 %----------------------------------------------%
 toc;
