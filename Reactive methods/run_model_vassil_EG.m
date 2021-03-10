@@ -56,7 +56,7 @@ layer.obstacle_storage.angle = [];
 layer.obstacle_storage.distance = [];
 layer.obstacle_storage.centre = [];
 % set tenacity (0 for left, 1 for right)
-tenacity = 1;
+tenacity = 0;
 % set terminate to 0
 terminate = 0;
 % Initially the active activeLayer is the first (and only) one
@@ -76,7 +76,7 @@ max_x = 10;
 max_y = 10;
 resolution = 10;
 % Choose scenario (start and goal defined in scenarios)
-scenario = 6;
+scenario = 5;
 
 [obstacleMap,start,goal]=mapEnvironments(resolution,scenario);
 xi(19) = start(1) - 5;
@@ -99,7 +99,6 @@ for outer_loop = 1:(sim_time/dT)
     cur_y = xi(20)+5;
     cur_psi = xi(24);
     cur_vel = xi(13);
-
     
     if abs(desired_psi - cur_psi)>0.1 
         step = step+1;
@@ -140,8 +139,8 @@ if at_waypoint == 1
 end 
 % run script to plot the sector distribution and obtain target path sector
 % Rt
-[layer,sensorData,activeLayer,prevEnvironment,...
-    Rt,prevRt,removefromSTM] = createSectorEnvironment_EG_v2(layer,...
+[layer,sensorData,activeLayer,...
+    Rt,removefromSTM] = createSectorEnvironment_EG_v2(layer,...
     activeLayer,scan,K,angleToGoal, cur_x,cur_y,outer_loop,removefromSTM);
 %
 %
@@ -160,8 +159,14 @@ if getMode == 1
     end
     noLayer = 0;
 end
+% If the prevEnvironment wasn't assigned (i.e. at first loop or when the
+% layer has been cleaned), assign it
+if ~exist('prevEnvironment','var')
+   prevEnvironment = layer(activeLayer).environment;
+   prevRt = layer(activeLayer).environment.Rt;
+end
 if getMode == 2
-   [R,getMode,activeLayer,layer,noLayer,removefromSTM] = followBoundary(layer,activeLayer,...
+   [R,getMode,activeLayer,layer,noLayer,removefromSTM,prevRt,prevEnvironment] = followBoundary(layer,activeLayer,...
     prevEnvironment,Rt,tenacity,getMode,prevRt,sensorData,scan,...
     angleToGoal,K,outer_loop,cur_x,cur_y,removefromSTM);
 
@@ -170,8 +175,8 @@ end
 % loop
 if noLayer == 1
     % create new environment
-    [layer,sensorData,activeLayer,prevEnvironment,...
-    Rt,prevRt,removefromSTM] = createSectorEnvironment_EG_v2(layer,...
+    [layer,sensorData,activeLayer,...
+    Rt,removefromSTM] = createSectorEnvironment_EG_v2(layer,...
     activeLayer,scan,K,angleToGoal, cur_x,cur_y,outer_loop,removefromSTM);
     desired_angle = layer(activeLayer).environment.angle(Rt);
 else
@@ -307,14 +312,16 @@ desired_psi = angleT2;
     ylabel('Y position [m]');
     title('Map of the environment');
     drawrobot(0.2,xi(20)+5,xi(19)+5,xi(24),'b');
-     goalPlot(1) = plot(goal(2),goal(1),'Marker','x','MarkerFaceColor','black',...
+    goalPlot(1) = plot(goal(2),goal(1),'Marker','x','MarkerFaceColor','blue',...
+     'LineWidth',1.5,'MarkerSize',10);
+    goalPlot(2) = plot(xio(1,20)+5,xio(1,19)+5,'Marker','x','MarkerFaceColor','red',...
      'LineWidth',1.5,'MarkerSize',10);
     pause(0.001);
 %     % draw the sectors 
-        for i=1:1:K
-        drawSectors(layer(activeLayer).environment.angle(i)...
-            ,cur_x,cur_y,layer(activeLayer).environment.sector(i),K,i,R,range)
-        end
+%         for i=1:1:K
+%         drawSectors(layer(activeLayer).environment.angle(i)...
+%             ,cur_x,cur_y,layer(activeLayer).environment.sector(i),K,i,R,range)
+%         end
     end
  % plot the gaps:
 %     if isfield(gap,"Gap")
@@ -337,8 +344,8 @@ end
 % Plot which points the robot reached
 figure(1);
 trajectory = plot(xio(:,20)+5,xio(:,19)+5,'k','LineStyle','--','LineWidth',2);
-trajectory.Color(4) = 0.25;
-legend([goalPlot(1),trajectory],{'Target','Path'});
+trajectory.Color(4) = 0.5;
+legend([goalPlot(1:2),trajectory],{'Target','Start','Path'});
 
 %----------------------------------------------%
 toc;

@@ -1,4 +1,4 @@
-function [R,getMode,activeLayer,layer,noLayer,removefromSTM] = followBoundary(layer,activeLayer,...
+function [R,getMode,activeLayer,layer,noLayer,removefromSTM,prevRt,prevEnvironment] = followBoundary(layer,activeLayer,...
     prevEnvironment,Rt,tenacity,getMode,prevRt,sensorData,scan,angleToGoal,...
     K,outer_loop,cur_x,cur_y,removefromSTM)
 % This function returns the angular region in which the robot should move
@@ -38,7 +38,7 @@ if isfield(layer(activeLayer),'environment') && ...
         layer(activeLayer).obstacle_storage.centre = [];
         % Create new layer:
         [layer,sensorData,activeLayer,...
-    prevEnvironment,Rt,prevRt]=createSectorEnvironment_EG_v2(layer,activeLayer,scan,...
+    Rt]=createSectorEnvironment_EG_v2(layer,activeLayer,scan,...
     K,angleToGoal,cur_x,cur_y,outer_loop);       
     else
         newLayer = 0;
@@ -109,6 +109,10 @@ if ~exist('noLayer','var')
     noLayer = 0;
 end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Save previous environment
+prevEnvironment = layer(activeLayer).environment;
+prevRt = Rt;
+%%%%%%%
 % Data Removal Section:
 if noLayer == 0
     %
@@ -122,7 +126,7 @@ if noLayer == 0
     % Check if it's consistent with the current sensor data:
     [cond]=isInconsistent_EG(Rcheck,layer(activeLayer),sensorData(activeLayer));
 
-    if cond
+    if cond        
         layer(activeLayer).environment.sector(Rcheck)='allowed';
         % Remove Rcheck from STM
         removefromSTM(end+1) = Rcheck;

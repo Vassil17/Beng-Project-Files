@@ -1,5 +1,5 @@
 function [layer,sensorData,activeLayer,...
-    prevEnvironment,Rt,prevRt,removefromSTM]=createSectorEnvironment_EG_v2(layer,activeLayer,scan,...
+    Rt,removefromSTM]=createSectorEnvironment_EG_v2(layer,activeLayer,scan,...
     K,angleToGoal,cur_x,cur_y,outer_loop,removefromSTM)
 
 % This function creates the angular sector distribution of the sensor
@@ -34,11 +34,13 @@ if angleToGoal >= 2*pi
     angleToGoal = angleToGoal - 2*pi;
 end
 % Store the old layer as prevEnvironment
-if isfield(layer(activeLayer),'environment') && ...
-        isfield(layer(activeLayer).environment,'sector')
-    prevEnvironment = layer(activeLayer).environment;
-    prevRt = layer(activeLayer).environment.Rt;
-end
+
+% if isfield(layer(activeLayer),'environment') && ...
+%         isfield(layer(activeLayer).environment,'sector')
+%     prevEnvironment = layer(activeLayer).environment;
+%     prevRt = layer(activeLayer).environment.Rt;
+% end
+
 %
 % Clear the old layer environment and create a new one
 clear layer(activeLayer).environment
@@ -87,12 +89,12 @@ if ~isempty(removeData)
     removefromSTM(removeData) = [];
 end
 layer(activeLayer).environment.Rt = Rt;
-% If the prevEnvironment wasn't assigned (i.e. at first loop or when the
-% layer has been cleaned), assign it
-if ~exist('prevEnvironment','var')
-   prevEnvironment = layer(activeLayer).environment;
-   prevRt = layer(activeLayer).environment.Rt;
-end
+% % If the prevEnvironment wasn't assigned (i.e. at first loop or when the
+% % layer has been cleaned), assign it
+% if ~exist('prevEnvironment','var')
+%    prevEnvironment = layer(activeLayer).environment;
+%    prevRt = layer(activeLayer).environment.Rt;
+% end
 % Save the data from the sensors (before STM is included) as sensorData
 sensorData(activeLayer) = layer(activeLayer);
 end
