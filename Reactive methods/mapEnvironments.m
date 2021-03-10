@@ -30,6 +30,14 @@ elseif scenario == 5
     map = 'scenario5.png';
     start = [3 1];
     goal = [1 2];
+elseif scenario == 6
+    map = 'scenario6.png';
+    start = [5 1];
+    goal = [5 8];
+elseif scenario == 7
+    map = 'scenario7.png';
+    start = [5 1];
+    goal = [5 9];
 end
 
     image = imread(map);
