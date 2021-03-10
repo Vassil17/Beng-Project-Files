@@ -161,7 +161,7 @@ if getMode == 1
 end
 % If the prevEnvironment wasn't assigned (i.e. at first loop or when the
 % layer has been cleaned), assign it
-if ~exist('prevEnvironment','var')
+if ~exist('prevEnvironment','var') || isempty(prevEnvironment)
    prevEnvironment = layer(activeLayer).environment;
    prevRt = layer(activeLayer).environment.Rt;
 end
