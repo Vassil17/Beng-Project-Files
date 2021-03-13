@@ -39,7 +39,8 @@ elseif scenario == 6
 elseif scenario == 7
     map = 'scenario7.png';
     start = [5 1];
-    goal = [5 9];
+    % goal = [5 9];
+    goal = [1 5];
 elseif scenario == 8
     map = 'scenario_test.png';
     start = [1.5 2];
