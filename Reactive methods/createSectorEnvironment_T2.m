@@ -102,32 +102,32 @@ if ~isempty(obstacle_storage.sector)
        for sector=1:length(newSector)
             environment.sector(newSector(sector)) = 'blocked';
        end
-       % This for loop makes sure that if a sector state is allowed but
-       % the one after it and the one before it are blocked, then block the
-       % middle one too.
-       % This is necessary due to the transformations and the way the
-       % sectors are designed.
-       for count = 1:length(environment.sector)
-           % This if nest ensures that the adjacent sectors are checked
-           % cyclically (1-2-3...-K-1-2-3-4...)
-           if count == length(environment.sector)-1 
-               first = count;
-               middle = count+1;
-               last = 1;
-           elseif count == length(environment.sector)
-               first = count;
-               middle = 1;
-               last = 2;               
-           else
-               first = count;
-               middle = count+1;
-               last = count+2;     
-           end
-           if strcmp(environment.sector(first),'blocked') &&...
-                   strcmp(environment.sector(last),'blocked')
-              environment.sector(middle) = 'blocked'; 
-           end
-       end
+%        % This for loop makes sure that if a sector state is allowed but
+%        % the one after it and the one before it are blocked, then block the
+%        % middle one too.
+%        % This is necessary due to the transformations and the way the
+%        % sectors are designed.
+%        for count = 1:length(environment.sector)
+%            % This if nest ensures that the adjacent sectors are checked
+%            % cyclically (1-2-3...-K-1-2-3-4...)
+%            if count == length(environment.sector)-1 
+%                first = count;
+%                middle = count+1;
+%                last = 1;
+%            elseif count == length(environment.sector)
+%                first = count;
+%                middle = 1;
+%                last = 2;               
+%            else
+%                first = count;
+%                middle = count+1;
+%                last = count+2;     
+%            end
+%            if strcmp(environment.sector(first),'blocked') &&...
+%                    strcmp(environment.sector(last),'blocked')
+%               environment.sector(middle) = 'blocked'; 
+%            end
+%        end
     end
 end
 

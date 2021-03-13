@@ -1,5 +1,5 @@
 function [psi_sg,psi_vg,subgoal,virtgoal,gap,closestGap]=TGF_algorithm(obstacleMap,...
-    scan,cur_x,cur_y,angleToGoal,goal,cur_psi)
+    scan,cur_x,cur_y,angleToGoal,goal,cur_psi,range)
 %
 % CHECKING LEAVING CONDITION NEEDS TO TAKE INTO ACCOUNT RANGE
 %
@@ -28,13 +28,34 @@ counter = 0;
 % Define three positions (top, middle and bottom of robot) to be used for
 % checking leaving condition
 pos = [cur_x-0.1 cur_y; cur_x cur_y; cur_x+0.1 cur_y];
+% then need to find angleToGoal in the standard coordinate system
+if angleToGoal <= 0
+    goalAngle = -angleToGoal;
+elseif angleToGoal >0 && angleToGoal <=pi
+    goalAngle = 2*pi - angleToGoal;
+end
+% add pi/2 because the 0 should be on the +ve x axis rather than +y axis
+goalAngle = goalAngle + pi/2;
 while ~terminate
     %
     % The leaving condition checks each position and its direct path to the
     % goal. The condition is only satisfied when all three paths are clear
+    %
+    % First check if the goal is within the sensor range:
+    % If it isn't within the range, then the point the path to which needs
+    % to be examined is the closest point in the same direction (goalAngle)
+    % but within the range.
+    distToGoal = sqrt((cur_x-goal(1))^2 + (cur_y - goal(2))^2);
+    if distToGoal <= range
+        checkTarget = goal;
+    else
+        checkTarget = [cur_x cur_y] + range*[sin(goalAngle) cos(goalAngle)];
+    end
+    %
+    %
     for ii=1:1:3
         start = pos(ii,:);
-        [directPath(:,1),directPath(:,2)]=straightLine(start,goal,50);
+        [directPath(:,1),directPath(:,2)]=straightLine(start,checkTarget,50);
         directPath = [directPath(:,2) directPath(:,1)];
      if ~any(checkOccupancy(obstacleMap,directPath))
          % if the path is clear for this position, add to counter
@@ -293,15 +314,7 @@ end
     % additional psi_vg for the virtual goal
     % d is the magnitude of the goal vector
     d = sqrt((goal(1)-cur_x)^2 + (goal(2)-cur_y)^2);
-    % then need to find angleToGoal in the standard coordinate system
-    if angleToGoal <= 0
-        goalAngle = -angleToGoal;
-    elseif angleToGoal >0 && angleToGoal <=pi
-        goalAngle = 2*pi - angleToGoal;
-    end
 
-    % add pi/2 because the 0 should be on the +ve x axis rather than +y axis
-    goalAngle = goalAngle + pi/2;
     v_goal = [d*cos(goalAngle);d*sin(goalAngle)];
     % Rotate v_goal by psi_sg to obtain v_sg (subgoal)
     % But psi_sg is defined relative to current heading so convert:

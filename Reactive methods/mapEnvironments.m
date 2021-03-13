@@ -13,11 +13,13 @@ if scenario == 1
     map = 'scenario1.png';
     start = [1 2];
     goal = [8 4];    
-    %goal = [3 2];
 elseif scenario == 2
-    map = 'scenario2.png';
-    start = [7 1];
-    goal = [9 8];
+    map = 'scenario1_updated.png';
+    start = [1 2];
+    goal = [8 4]; 
+%     map = 'scenario2.png';
+%     start = [5.5 1];
+%     goal = [8 7.8];
 elseif scenario == 3
     map = 'scenario3.png';
     start = [5.5 5];
@@ -29,7 +31,7 @@ elseif scenario == 4
 elseif scenario == 5
     map = 'scenario5.png';
     start = [3 1];
-    goal = [1 2];
+    goal = [1 5];
 elseif scenario == 6
     map = 'scenario6.png';
     start = [5 1];
@@ -38,12 +40,17 @@ elseif scenario == 7
     map = 'scenario7.png';
     start = [5 1];
     goal = [5 9];
+elseif scenario == 8
+    map = 'scenario_test.png';
+    start = [1.5 2];
+    goal = [4 2];
+
 end
 
     image = imread(map);
     grayimage = rgb2gray(image);
     bwimage = grayimage < 0.5;
-    obstacleMap = binaryOccupancyMap(bwimage,1000/resolution);
+    obstacleMap = binaryOccupancyMap(bwimage,100);
 
 
 end

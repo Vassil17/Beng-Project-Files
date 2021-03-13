@@ -27,6 +27,8 @@ err_vel_i(1) = 0;
 stopRobot = 0;
 desired_psi = 0;
 desired_psi_360=0;
+desired_vel = 0;
+step = 0;
 %
 % LiDAR Range
 range = 1;
@@ -40,7 +42,7 @@ obstacle_storage.angle = [];
 obstacle_storage.distance = [];
 obstacle_storage.centre = [];
 % set tenacity (0 for left, 1 for right)
-tenacity = 0;
+tenacity = 1;
 % set terminate to 0
 terminate = 0;
 %
@@ -52,7 +54,7 @@ max_x = 10;
 max_y = 10;
 resolution = 10;
 % Choose scenario (start and goal defined in scenarios)
-scenario = 5;
+scenario = 1;
 
 [obstacleMap,start,goal]=mapEnvironments(resolution,scenario);
 xi(19) = start(1) - 5;
@@ -75,12 +77,24 @@ for outer_loop = 1:(sim_time/dT)
     %
     %
     %
-    % CONTROLLER SECTION
+     % CONTROLLER SECTION
     cur_x = xi(19)+5;
     cur_y = xi(20)+5;
     cur_psi = xi(24);
     cur_vel = xi(13);
-    n = outer_loop;
+    
+    if abs(desired_psi - cur_psi)>0.1 
+        step = step+1;
+    elseif abs(desired_vel - cur_vel)>0.1
+        step = step+1;
+    else
+        % when the desired heading and velocity have been achieved clear the PID
+        % controller
+        step=1;
+        clear u_psi u_vel err_psi err_psi_d err_psi_i err_vel err_vel_d err_vel_i;
+        err_psi_i(step) = 0;
+        err_vel_i(step) = 0;
+    end
 
     % Change heading to be from 0 to 360 degrees   
 
@@ -111,7 +125,14 @@ end
 % Rt
 [environment,Rt,obstacle_storage] = createSectorEnvironment_T2(scan,K,angleToGoal,...
     cur_x,cur_y,obstacle_storage,outer_loop);
-
+%
+%
+% For left tenacity search anticlockwise (2), for right - clockwise (1)
+if tenacity == 0
+    search = 2;
+else
+    search = 1;
+end
 % if Rt sector is allowed choose it
 if strcmp(environment.sector(Rt),'allowed')
     R = Rt;
@@ -123,7 +144,11 @@ if strcmp(environment.sector(Rt),'allowed')
 else
     % mark the Rt sector as allowed in order to search its neighbours
     environment.sector(Rt) = 'allowed';
-    [R] = calculateR(Rt,environment,'allowed',tenacity,'T2');
+    [R] = calculateR(Rt,environment,'allowed',search,'T2');
+    if R == Rt
+       terminate=1;
+       continue;
+    end
     environment.sector(Rt) = 'blocked';
 end
 
@@ -156,22 +181,22 @@ desired_psi = desired_psi + pi/2;
         desired_psi_360 = desired_psi;
     end
    
-    
-    err_psi(n) = desired_psi_360 - cur_psi_360;
+
+    err_psi(step) = desired_psi_360 - cur_psi_360;
     % error shouldn't be bigger than 180 degrees:
-    if abs(err_psi(n)) > pi
-        err_psi(n)=-sign(err_psi(n))*(2*pi-abs(err_psi(n)));
+    if abs(err_psi(step)) > pi
+        err_psi(step)=-sign(err_psi(step))*(2*pi-abs(err_psi(step)));
     end
     % If robot has been told to stop or heading is 0, set vel to 0
-    if stopRobot == 1 || abs(err_psi(n)) > 0.1
+    if stopRobot == 1 || abs(err_psi(step)) > 0.1
         desired_vel = 0;
     else
         [desired_vel] = getVelocity(goal,cur_x,cur_y);
     end
     % store desired velocity throughout simulation for later plotting
-    desired_velocity(n) = desired_vel;
+    desired_velocity(step) = desired_vel;
     
-    err_vel(n) = desired_vel - cur_vel;
+    err_vel(step) = desired_vel - cur_vel;
 %---------------------------------------------------------------------%
         
     % PID Controllers for heading and velocity:
@@ -184,35 +209,35 @@ desired_psi = desired_psi + pi/2;
     Ki_vel = 35;   %70
     Kd_vel = .01;  %.01
 
-    if n == 1
-        prev_n = 1;
+    if step == 1
+        prevStep = 1;
     else
-        prev_n = n-1;
+        prevStep = step-1;
     end
     % For error in psi:
     %
     % Using Euler's backward rule
-    err_psi_i(n) = err_psi_i(prev_n)  + err_psi(n)*dT; 
-    err_psi_d(n) = (err_psi(n) - err_psi(prev_n))/dT;
+    err_psi_i(step) = err_psi_i(prevStep)  + err_psi(step)*dT; 
+    err_psi_d(step) = (err_psi(step) - err_psi(prevStep))/dT;
 
-    u_psi(n) = Kp_psi * err_psi(n) + Ki_psi * err_psi_i(n) +...
-        + Kd_psi * err_psi_d(n) ;
+    u_psi(step) = Kp_psi * err_psi(step) + Ki_psi * err_psi_i(step) +...
+        + Kd_psi * err_psi_d(step) ;
     %
     %
     % For error in velocity:
-    err_vel_i(n) = err_vel_i(prev_n)  + err_vel(n)*dT;
-    err_vel_d(n) = (err_vel(n) - err_vel(prev_n))/dT;
+    err_vel_i(step) = err_vel_i(prevStep)  + err_vel(step)*dT;
+    err_vel_d(step) = (err_vel(step) - err_vel(prevStep))/dT;
 
-    u_vel(n) = Kp_vel*err_vel(n)+Ki_vel*err_vel_i(n)+Kd_vel*err_vel_d(n);
+    u_vel(step) = Kp_vel*err_vel(step)+Ki_vel*err_vel_i(step)+Kd_vel*err_vel_d(step);
 %------------------------------------------------------------------%
 % Convert inputs into voltages:    
-    if abs(u_vel(n))> 12
-        u_vel(n) = sign(u_vel(n))*12;
+    if abs(u_vel(step))> 12
+        u_vel(step) = sign(u_vel(step))*12;
     end
 
 
-    Vl = (u_vel(n) + u_psi(n))/2;
-    Vr = (u_vel(n) - u_psi(n))/2;
+    Vl = (u_vel(step) + u_psi(step))/2;
+    Vr = (u_vel(step) - u_psi(step))/2;
 
 
     if Vl > 7.4 || Vl < -7.4
@@ -223,8 +248,8 @@ desired_psi = desired_psi + pi/2;
     end
 
     
-     V_matrix(1,n) = Vl;
-     V_matrix(2,n) = Vr;
+     V_matrix(1,step) = Vl;
+     V_matrix(2,step) = Vr;
 
     %
     %
@@ -252,9 +277,11 @@ desired_psi = desired_psi + pi/2;
     title('Map of the environment');
     drawrobot(0.2,xi(20)+5,xi(19)+5,xi(24),'b');
     % plot the goal point
-    goal_marker = plot(goal(2),goal(1),'Marker','x','MarkerFaceColor','black',...
+    goalPlot(1) = plot(start(2),start(1),'Marker','x','MarkerEdgeColor','red',...
         'LineWidth',2,'MarkerSize',12);
-
+    goalPlot(2) = plot(goal(2),goal(1),'Marker','x','MarkerEdgeColor','[0.9290, 0.6940, 0.1250]',...
+        'LineWidth',2,'MarkerSize',12);
+    set(goalPlot,'linestyle','none');
     % draw the sectors 
     for i=1:1:K
         drawSectors(environment.angle(i),cur_x,cur_y,environment.sector(i),K,i,R,range)
@@ -284,7 +311,8 @@ end
 %----------------------------------------------%
 % Plot which points the robot reached
 figure(1);
-trajectory = plot(xio(:,20)+5,xio(:,19)+5,'k','LineWidth',2);
+trajectory = plot(xio(:,20)+5,xio(:,19)+5,'k','LineStyle','--','LineWidth',2);
+trajectory.Color(4) = 0.5;
 % for q = 1:size(plotStorage,1)
 % drawrobot(0.2,plotStorage(q,1),plotStorage(q,2),plotStorage(q,3),'b');
 % end
@@ -298,7 +326,7 @@ trajectory = plot(xio(:,20)+5,xio(:,19)+5,'k','LineWidth',2);
 %         drawSectors(angle,cur_x,cur_y,sector,K,k,R,range)
 %     end
 % end
-legend([goal_marker,trajectory],{'Target','Path'});
+legend([goalPlot(1:2) trajectory],{'Start','Goal','Path'},'FontSize',12); 
 
 %----------------------------------------------%
 toc;

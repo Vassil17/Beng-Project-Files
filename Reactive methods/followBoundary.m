@@ -25,7 +25,7 @@ if isfield(layer(activeLayer),'environment') && ...
 %     prevEnvironment = layer(activeLayer).environment;
 %     prevRt = layer(activeLayer).environment.Rt;
     if all(strcmp(layer(activeLayer).environment.sector,'blocked'))
-        % create a new activeLayer and make it active
+        % create a new activeLayer and make it active      
         activeLayer = activeLayer+1;
         % remember at which step this occured
         newLayer = 1;

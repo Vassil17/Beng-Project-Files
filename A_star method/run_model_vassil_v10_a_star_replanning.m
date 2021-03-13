@@ -12,12 +12,6 @@ clc;
 
 %----------------------------------------------%
 % Setup Simulation
-goal = [9 8];
-% goal and starting point for path need to be defined with angle due to the
-% way MATLAB defines the planner
-goal_path = [goal 0];
-start = [6 1];
-start_path = [start pi/2];
 sim_time = 60;
 dT = 0.05;
 point = 1;
@@ -35,6 +29,8 @@ desired_psi_360=0;
 originalPosition = 0;
 stateChanged = 0;
 current_point = 0;
+desired_vel = 0;
+step = 0;
 %----------------------------------------------%
 
 %----------------------------------------------%
@@ -43,52 +39,24 @@ max_x = 10;
 max_y = 10;
 resolution = 10;
 
-%
-% Create the obstacle map
-obstacleMap = binaryOccupancyMap(max_x,max_y,resolution);
-estimatedMap = binaryOccupancyMap(max_x,max_y,resolution);
-
-wall{1} = WallGeneration1(0,7.5,6,6,'h');
-wall{2} = WallGeneration1(3,10,7,7,'h');
-wall{3} = WallGeneration1(2,2,6,8,'v');
-wall{4} = WallGeneration1(2,8,8,8,'h');
-wall{5} = WallGeneration1(3,9,4,4,'h');
-wall{6} = WallGeneration1(2,2,2,5,'v');
-wall{7} = WallGeneration1(0,2,5,5,'h');
-wall{8} = WallGeneration1(9,10,5,5,'h');
-wall{9} = WallGeneration1(3,3,2,4,'v');
-wall{10} = WallGeneration1(3,5,5,5,'h');
-wall{11} = WallGeneration1(5,5,5,6,'v');
-wall{12} = WallGeneration1(9,9,4,5,'v');
+% Choose scenario (start and goal defined in scenarios)
+scenario = 7;
+scenario_updated = 7;
+[obstacleMap,start,goal]=mapEnvironments(resolution,scenario_updated);
+[estimatedMap,~]=mapEnvironments(resolution,scenario);
+[plotObstacleMap,~]=mapEnvironments(resolution,scenario_updated);
+xi(19) = start(1) - 5;
+xi(20) = start(2) - 5;
+goal_path = [goal(2) goal(1) 0];
+start_path = [start(2) start(1) pi/2];
+% Inflate the obstacles:
+% inflate(obstacleMap,0.1);
+% inflate(estimatedMap,0.1);
 % Create range sensor
-obstacleSensor = rangeSensor('HorizontalAngle', pi/2);
+obstacleSensor = rangeSensor('Range',[0 2],'HorizontalAngle',[-pi pi]);
 numReadings = obstacleSensor.NumReadings;
-for counter=1:length(wall)
-    clear x; clear y;
-    for i=1:length(wall{counter})
-        x(i) = wall{counter}(i,1);
-        y(i) = wall{counter}(i,2);        
-    end
-    x=x.';
-    y=y.';
-
-    setOccupancy(obstacleMap, [x y], ones(i,1));
-    setOccupancy(estimatedMap, [x y], ones(i,1));
-end
-object{1} = WallGeneration1(6,6,4,5,'v');
-object{2} = WallGeneration1(7.5,7.5,5,6,'v');
-for counter=1:length(object)
-    clear x; clear y;
-    for i=1:length(object{counter})
-        x(i) = object{counter}(i,1);
-        y(i) = object{counter}(i,2);        
-    end
-    x=x.';
-    y=y.';
-
-    setOccupancy(obstacleMap, [x y], ones(i,1)) 
-    
-end
+startTime = [];
+endTime = [];
 %----------------------------------------------%
 tic;
 %----------------------------------------------%
@@ -102,7 +70,19 @@ for outer_loop = 1:(sim_time/dT)
     cur_y = xi(20)+5;
     cur_psi = xi(24);
     cur_vel = xi(13);
-    n = outer_loop;
+    
+    if abs(desired_psi - cur_psi)>0.1 
+        step = step+1;
+    elseif abs(desired_vel - cur_vel)>0.1
+        step = step+1;
+    else
+        % when the desired heading and velocity have been achieved clear the PID
+        % controller
+        step=1;
+        clear u_psi u_vel err_psi err_psi_d err_psi_i err_vel err_vel_d err_vel_i;
+        err_psi_i(step) = 0;
+        err_vel_i(step) = 0;
+    end
 
     % Change heading to be from 0 to 360 degrees   
 
@@ -126,7 +106,7 @@ for outer_loop = 1:(sim_time/dT)
 % Behavior - A* pathplanning
 %
 % Save current cputime
-startTime = cputime;
+startTime(end+1) = cputime;
 % Initially, create the plan:
     
     if current_point == 0
@@ -136,20 +116,22 @@ startTime = cputime;
         validator = validatorOccupancyMap;
         validator.Map = estimatedMap;
         planner = plannerHybridAStar(validator,'MinTurningRadius',0.64);
+        storePlanner(1) = planner;
         % Create plan based on global map
         path = plan(planner,start_path,goal_path);
         % Create points for robot to follow
         path=path.States;
         startPoses = path(1:end-1,:);
         endPoses = path(2:end,:);
-        rsConn = reedsSheppConnection('MinTurningRadius', planner.MinTurningRadius);
-        rsPathSegs = connect(rsConn, startPoses, endPoses);
         poses = [];
-        for i = 1:numel(rsPathSegs)
-            lengths = 0:0.1:rsPathSegs{i}.Length;
-            [pose, ~] = interpolate(rsPathSegs{i}, lengths);
-            poses = [poses; pose];
+        for i=1:size(startPoses,1)
+           [xx,yy]=straightLine(startPoses(i,1:2),endPoses(i,1:2),100);
+           pose = [xx' yy'];
+           poses = [poses; pose];
         end
+        storeCnt = 1;
+        pathStorage = struct;
+        pathStorage(storeCnt).Path = [poses];
         poses_inverted = poses;
         poses=[poses(:,2),poses(:,1)];
         current_point = current_point + 1;
@@ -159,25 +141,26 @@ startTime = cputime;
         [ranges, angles] = obstacleSensor([cur_y cur_x cur_psi], obstacleMap);
         insertRay(estimatedMap, [cur_y cur_x cur_psi], ranges, angles, ...
         obstacleSensor.Range(end));
-        %  drawnow;
+         % drawnow;
         if any(checkOccupancy(estimatedMap,poses_inverted(:,1:2)))
-            current_point = 1;
+                current_point = 1;
+            storeCnt = storeCnt+1;   
             validator.Map = estimatedMap;
             planner = plannerHybridAStar(validator,'MinTurningRadius',0.64,'ReverseCost',6);
+            storePlanner(end+1) = planner;
             % Create plan
             path = plan(planner,[cur_y cur_x cur_psi],goal_path);
             % Create points for robot to follow
             path=path.States;
             startPoses = path(1:end-1,:);
-            endPoses = path(2:end,:);
-            rsConn = reedsSheppConnection('MinTurningRadius', planner.MinTurningRadius);
-            rsPathSegs = connect(rsConn, startPoses, endPoses);
+            endPoses = path(2:end,:);   
             poses = [];
-            for i = 1:numel(rsPathSegs)
-                lengths = 0:0.1:rsPathSegs{i}.Length;
-                [pose, ~] = interpolate(rsPathSegs{i}, lengths);
-                poses = [poses; pose];
-            end
+           for i=1:size(startPoses,1)
+               [xx,yy]=straightLine(startPoses(i,1:2),endPoses(i,1:2),100);
+               pose = [xx' yy'];
+               poses = [poses; pose];
+           end
+           pathStorage(storeCnt).Path = [poses];
             poses_inverted = poses;
             poses=[poses(:,2),poses(:,1)];
         else              
@@ -200,7 +183,7 @@ startTime = cputime;
         end
     end
   % Save cputime again to see how long the planning took; 
-  endTime = cputime - startTime; 
+  endTime(end+1) = cputime - startTime(end); 
 %
 %
 %-------------------------------------------------------------------------%    
@@ -223,21 +206,21 @@ startTime = cputime;
     end
    
     
-    err_psi(n) = desired_psi_360 - cur_psi_360;
+    err_psi(step) = desired_psi_360 - cur_psi_360;
     % error shouldn't be bigger than 180 degrees:
-    if abs(err_psi(n)) > pi
-        err_psi(n)=-sign(err_psi(n))*(2*pi-abs(err_psi(n)));
+    if abs(err_psi(step)) > pi
+        err_psi(step)=-sign(err_psi(step))*(2*pi-abs(err_psi(step)));
     end
     % If robot has been told to stop or heading is 0, set vel to 0
-    if stopRobot == 1 || abs(err_psi(n)) > 0.1
+    if stopRobot == 1 || abs(err_psi(step)) > 0.1
         desired_vel = 0;
     else
         [desired_vel] = getVelocity(goal(point,:),cur_x,cur_y);
     end
     % store desired velocity throughout simulation for later plotting
-    desired_velocity(n) = desired_vel;
+    desired_velocity(step) = desired_vel;
     
-    err_vel(n) = desired_vel - cur_vel;
+    err_vel(step) = desired_vel - cur_vel;
 %---------------------------------------------------------------------%
         
     % PID Controllers for heading and velocity:
@@ -250,35 +233,35 @@ startTime = cputime;
     Ki_vel = 35;   %70
     Kd_vel = .01;  %.01
 
-    if n == 1
-        prev_n = 1;
+    if step == 1
+        prevStep = 1;
     else
-        prev_n = n-1;
+        prevStep = step-1;
     end
     % For error in psi:
     %
     % Using Euler's backward rule
-    err_psi_i(n) = err_psi_i(prev_n)  + err_psi(n)*dT; 
-    err_psi_d(n) = (err_psi(n) - err_psi(prev_n))/dT;
+    err_psi_i(step) = err_psi_i(prevStep)  + err_psi(step)*dT; 
+    err_psi_d(step) = (err_psi(step) - err_psi(prevStep))/dT;
 
-    u_psi(n) = Kp_psi * err_psi(n) + Ki_psi * err_psi_i(n) +...
-        + Kd_psi * err_psi_d(n) ;
+    u_psi(step) = Kp_psi * err_psi(step) + Ki_psi * err_psi_i(step) +...
+        + Kd_psi * err_psi_d(step) ;
     %
     %
     % For error in velocity:
-    err_vel_i(n) = err_vel_i(prev_n)  + err_vel(n)*dT;
-    err_vel_d(n) = (err_vel(n) - err_vel(prev_n))/dT;
+    err_vel_i(step) = err_vel_i(prevStep)  + err_vel(step)*dT;
+    err_vel_d(step) = (err_vel(step) - err_vel(prevStep))/dT;
 
-    u_vel(n) = Kp_vel*err_vel(n)+Ki_vel*err_vel_i(n)+Kd_vel*err_vel_d(n);
+    u_vel(step) = Kp_vel*err_vel(step)+Ki_vel*err_vel_i(step)+Kd_vel*err_vel_d(step);
 %------------------------------------------------------------------%
 % Convert inputs into voltages:    
-    if abs(u_vel(n))> 12
-        u_vel(n) = sign(u_vel(n))*12;
+    if abs(u_vel(step))> 12
+        u_vel(step) = sign(u_vel(step))*12;
     end
 
 
-    Vl = (u_vel(n) + u_psi(n))/2;
-    Vr = (u_vel(n) - u_psi(n))/2;
+    Vl = (u_vel(step) + u_psi(step))/2;
+    Vr = (u_vel(step) - u_psi(step))/2;
 
 
     if Vl > 7.4 || Vl < -7.4
@@ -289,8 +272,8 @@ startTime = cputime;
     end
 
     
-     V_matrix(1,n) = Vl;
-     V_matrix(2,n) = Vr;
+     V_matrix(1,step) = Vl;
+     V_matrix(2,step) = Vr;
 
     %
     %
@@ -309,12 +292,14 @@ startTime = cputime;
     %----------------------------------------------%
     
     %----------------------------------------------%
-
     figure(1);
-    clf; show(obstacleMap);
-    grid on; hold on;
+    clf; show(plotObstacleMap);grid on; hold on;
     drawrobot(0.2,xi(20)+5,xi(19)+5,xi(24),'b');
-    plot(goal(1),goal(2),'-o');
+    goalPlot(1) = plot(goal(2),goal(1),'Marker','x','MarkerFaceColor','blue',...
+     'LineWidth',1.5,'MarkerSize',10);
+    goalPlot(2) = plot(xio(1,20)+5,xio(1,19)+5,'Marker','x','MarkerFaceColor','red',...
+     'LineWidth',1.5,'MarkerSize',10);
+    
     for i=1:20:size(poses,1)
        plot(poses(:,2),poses(:,1));
     end
@@ -328,10 +313,9 @@ toc;
 %----------------------------------------------%
 % Plot which points the robot reached
 figure(1);
-for i=1:1:size(goal,1)
-   % plot(robot_path(i,2),robot_path(i,1),'-x');
-    plot(xio(:,20)+5,xio(:,19)+5,'k');
-end
+trajectory = plot(xio(:,20)+5,xio(:,19)+5,'k','LineStyle','--','LineWidth',2);
+trajectory.Color(4) = 0.5;
+legend([goalPlot(1:2),trajectory],{'Target','Start','Path'});
 %----------------------------------------------%
 %Plot Variables
 % figure(2); plot(xio(:,20),xio(:,19));
