@@ -40,19 +40,19 @@ max_y = 10;
 resolution = 10;
 
 % Choose scenario (start and goal defined in scenarios)
-scenario =1;
+scenario =9;
 
 [obstacleMap,start,goal]=mapEnvironments(resolution,scenario);
 [plotObstacleMap,~]=mapEnvironments(resolution,scenario);
 xi(19) = start(1) - 5;
 xi(20) = start(2) - 5;
-goal_path = [goal(2) goal(1) 0];
-start_path = [start(2) start(1) pi/2];
+goal_path = [goal(2) goal(1) pi/2]; % pi/2 for scenario1
+start_path = [start(2) start(1) pi/2]; %-0.5
 % Inflate the obstacles:
-inflate(obstacleMap,0.1)
+%inflate(obstacleMap,0.1)
 
 %----------------------------------------------%
-tic;
+startTime = tic;
 %----------------------------------------------%
 for outer_loop = 1:(sim_time/dT)
     %----------------------------------------------%
@@ -114,6 +114,7 @@ for outer_loop = 1:(sim_time/dT)
     if current_point == 0
         % Define algorithm to use for pathfinding
         % Create validator
+        algTime = tic;
         validator = validatorOccupancyMap;
         validator.Map = obstacleMap;
         planner = plannerHybridAStar(validator,'MinTurningRadius',0.64);
@@ -128,7 +129,7 @@ for outer_loop = 1:(sim_time/dT)
 %        rsPathSegs = connect(rsConn, startPoses, endPoses);
         poses = [];
         for i=1:size(startPoses,1)
-           [xx,yy]=straightLine(startPoses(i,1:2),endPoses(i,1:2),10);
+           [xx,yy]=straightLine(startPoses(i,1:2),endPoses(i,1:2),100);
            pose = [xx' yy'];
            poses = [poses; pose];
         end
@@ -140,6 +141,7 @@ for outer_loop = 1:(sim_time/dT)
         poses_inverted = poses;
         poses=[poses(:,2),poses(:,1)];
         current_point = current_point + 1;
+        endTime = toc(algTime);
     else
         % Tell robot to follow each point
         % goal_coordinate flips x and y coordinates (otherwise it doesnt
@@ -268,19 +270,22 @@ for outer_loop = 1:(sim_time/dT)
     %----------------------------------------------%
     
     %----------------------------------------------%
-%     figure(1);
-%     clf; show(plotObstacleMap);grid on; hold on;
-%     drawrobot(0.2,xi(20)+5,xi(19)+5,xi(24),'b');
-%     % plot the goal point
-%     goalPlot(1) = plot(start(2),start(1),'Marker','x','MarkerEdgeColor','red',...
-%         'LineWidth',2,'MarkerSize',12);
-%     goalPlot(2) = plot(goal(2),goal(1),'Marker','x','MarkerEdgeColor','[0.9290, 0.6940, 0.1250]',...
-%         'LineWidth',2,'MarkerSize',12);
-%     set(goalPlot,'linestyle','none');
-% %     for i=1:20:size(poses,1)
-% %        plot(poses(:,2),poses(:,1));
-% %     end
-%     pause(0.001);
+   
+    if mod(outer_loop,10) == 0
+    figure(1);
+    clf; show(plotObstacleMap);grid on; hold on;
+    drawrobot(0.2,xi(20)+5,xi(19)+5,xi(24),'b');
+    % plot the goal point
+    goalPlot(1) = plot(start(2),start(1),'Marker','x','MarkerEdgeColor','red',...
+        'LineWidth',2,'MarkerSize',12);
+    goalPlot(2) = plot(goal(2),goal(1),'Marker','x','MarkerEdgeColor','[0.9290, 0.6940, 0.1250]',...
+        'LineWidth',2,'MarkerSize',12);
+    set(goalPlot,'linestyle','none');
+%     for i=1:20:size(poses,1)
+%        plot(poses(:,2),poses(:,1));
+%     end
+    end
+    pause(0.001);
     %----------------------------------------------%
     
 end
@@ -291,7 +296,7 @@ end
 % trajectory.Color(4) = 0.5;
 % legend([goalPlot(1:2),trajectory],{'Start','Goal','Path'});
 %----------------------------------------------%
-toc;
+runtime = toc(startTime);
 %Plot Variables
 % figure(2); plot(xio(:,20),xio(:,19));
 % figure(3); plot(xio(:,19));

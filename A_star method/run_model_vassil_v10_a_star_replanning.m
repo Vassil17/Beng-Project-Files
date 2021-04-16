@@ -18,6 +18,7 @@ point = 1;
 xi = zeros(1,24); % initial state for x
 xi(19) = -4;
 xi(20) = 1;
+xi(24) = pi/2;
 LeftS = 0;
 RightS = 0;
 err_psi_i(1) = 0;
@@ -38,27 +39,38 @@ step = 0;
 max_x = 10;
 max_y = 10;
 resolution = 10;
-
+%
+%
+dontRecheck = 0;
 % Choose scenario (start and goal defined in scenarios)
-scenario = 7;
-scenario_updated = 7;
+scenario = 13; % 12 is the estimated version of 6
+scenario_updated = 8; 
 [obstacleMap,start,goal]=mapEnvironments(resolution,scenario_updated);
 [estimatedMap,~]=mapEnvironments(resolution,scenario);
 [plotObstacleMap,~]=mapEnvironments(resolution,scenario_updated);
+%
+%
+%
+%start(2) = start(2) - 0.5; 
+%
+%
 xi(19) = start(1) - 5;
 xi(20) = start(2) - 5;
-goal_path = [goal(2) goal(1) 0];
+goal_path = [goal(2) goal(1) pi/2]; %for scenario 10
+%goal_path = [13.8 6 pi];
 start_path = [start(2) start(1) pi/2];
 % Inflate the obstacles:
 % inflate(obstacleMap,0.1);
 % inflate(estimatedMap,0.1);
 % Create range sensor
-obstacleSensor = rangeSensor('Range',[0 2],'HorizontalAngle',[-pi pi]);
+obstacleSensor = rangeSensor('Range',[0 2],'HorizontalAngle',[-pi pi],...
+    'HorizontalAngleResolution',0.01);
 numReadings = obstacleSensor.NumReadings;
 startTime = [];
 endTime = [];
+counterPlan = 0;
 %----------------------------------------------%
-tic;
+startTime = tic;
 %----------------------------------------------%
 for outer_loop = 1:(sim_time/dT)
     %----------------------------------------------%
@@ -106,16 +118,21 @@ for outer_loop = 1:(sim_time/dT)
 % Behavior - A* pathplanning
 %
 % Save current cputime
-startTime(end+1) = cputime;
 % Initially, create the plan:
     
+angle(cur_psi<0) = -cur_psi;
+angle(cur_psi>0) = 2*pi - cur_psi;
+angle(cur_psi==0) = cur_psi;
+
     if current_point == 0
-        
+        algTime = tic;
         % Define algorithm to use for pathfinding
         % Create validator
         validator = validatorOccupancyMap;
         validator.Map = estimatedMap;
         planner = plannerHybridAStar(validator,'MinTurningRadius',0.64);
+        %planner.MotionPrimitiveLength = 0.25;
+        planner.DirectionSwitchingCost = 1;
         storePlanner(1) = planner;
         % Create plan based on global map
         path = plan(planner,start_path,goal_path);
@@ -129,6 +146,7 @@ startTime(end+1) = cputime;
            pose = [xx' yy'];
            poses = [poses; pose];
         end
+        endTime(end+1) = toc(algTime);
         storeCnt = 1;
         pathStorage = struct;
         pathStorage(storeCnt).Path = [poses];
@@ -142,14 +160,23 @@ startTime(end+1) = cputime;
         insertRay(estimatedMap, [cur_y cur_x cur_psi], ranges, angles, ...
         obstacleSensor.Range(end));
          % drawnow;
-        if any(checkOccupancy(estimatedMap,poses_inverted(:,1:2)))
-                current_point = 1;
+        check = any(checkOccupancy(estimatedMap,poses_inverted(:,1:2)));
+        if check
+           counterPlan=counterPlan+1;    
+        end
+        if check && ~dontRecheck && mod(counterPlan,20)==0
+            replanTime = tic;
+            current_point = 1;
             storeCnt = storeCnt+1;   
             validator.Map = estimatedMap;
-            planner = plannerHybridAStar(validator,'MinTurningRadius',0.64,'ReverseCost',6);
+            planner = plannerHybridAStar(validator,...
+                'MinTurningRadius',.64,'ReverseCost',8);
+            planner.NumMotionPrimitives = 5;
+            planner.MotionPrimitiveLength = 0.1;
+            planner.DirectionSwitchingCost = 1;
             storePlanner(end+1) = planner;
             % Create plan
-            path = plan(planner,[cur_y cur_x cur_psi],goal_path);
+            path = plan(planner,[cur_y cur_x angle+pi/2],goal_path);
             % Create points for robot to follow
             path=path.States;
             startPoses = path(1:end-1,:);
@@ -163,6 +190,7 @@ startTime(end+1) = cputime;
            pathStorage(storeCnt).Path = [poses];
             poses_inverted = poses;
             poses=[poses(:,2),poses(:,1)];
+           endTime(end+1) = toc(replanTime);
         else              
         % Tell robot to follow each point
         % goal_coordinate flips x and y coordinates (otherwise it doesnt
@@ -182,9 +210,7 @@ startTime(end+1) = cputime;
         end
         end
     end
-  % Save cputime again to see how long the planning took; 
-  endTime(end+1) = cputime - startTime(end); 
-%
+
 %
 %-------------------------------------------------------------------------%    
 
@@ -292,6 +318,7 @@ startTime(end+1) = cputime;
     %----------------------------------------------%
     
     %----------------------------------------------%
+    if mod(outer_loop,10)==0
     figure(1);
     clf; show(plotObstacleMap);grid on; hold on;
     drawrobot(0.2,xi(20)+5,xi(19)+5,xi(24),'b');
@@ -304,12 +331,13 @@ startTime(end+1) = cputime;
        plot(poses(:,2),poses(:,1));
     end
     
+    end
 
     pause(0.001);
     %----------------------------------------------%
     
 end
-toc;
+runtime = toc(startTime);
 %----------------------------------------------%
 % Plot which points the robot reached
 figure(1);

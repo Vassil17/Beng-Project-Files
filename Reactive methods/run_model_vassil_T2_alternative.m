@@ -54,7 +54,7 @@ max_x = 10;
 max_y = 10;
 resolution = 10;
 % Choose scenario (start and goal defined in scenarios)
-scenario = 5;
+scenario = 16;
 
 [obstacleMap,start,goal]=mapEnvironments(resolution,scenario);
 xi(19) = start(1) - 5;
@@ -67,6 +67,7 @@ sectorPlotStorage = [];
 qq = 0;
 %-----------------------------------------------------------------------%
 tic;
+cpuStart = cputime;
 %----------------------------------------------%
 
 for outer_loop = 1:(sim_time/dT)
@@ -125,6 +126,18 @@ end
 % Rt
 [environment,Rt,obstacle_storage] = createSectorEnvironment_T2(scan,K,angleToGoal,...
     cur_x,cur_y,obstacle_storage,outer_loop);
+% This checks if Rt is allowed based on purely sensor data (not STM)
+if strcmp(environment.sector(Rt),'allowed')
+    checkRt = 1;
+else
+    checkRt = 0;
+end
+
+cond = ~isempty(obstacle_storage.sector);
+if cond
+    [environment,obstacle_storage] = addSTMobstacles_T2(environment,obstacle_storage,K,Rt);
+end
+
 %
 %
 % For left tenacity search anticlockwise (2), for right - clockwise (1)
@@ -146,6 +159,12 @@ else
     environment.sector(Rt) = 'allowed';
     [R] = calculateR(Rt,environment,'allowed',search,'T2');
     environment.sector(Rt) = 'blocked';
+    if R == Rt
+       % check if Rt was banned based on sensor data only
+       if checkRt ~= 1
+          terminate=1;
+       end
+    end
 end
 
 desired_angle = environment.angle(R);
@@ -265,7 +284,7 @@ desired_psi = desired_psi + pi/2;
     % Plot the robot and sectors
     %----------------------------------------------%
     % refresh plot every X steps
-    if mod(outer_loop,5)==0
+    if mod(outer_loop,10)==0
     figure(1);
     clf; show(obstacleMap);grid on; hold on;
     xlabel('X position [m]');
@@ -303,7 +322,8 @@ desired_psi = desired_psi + pi/2;
  %----------------------------------------------%
     
 end
-
+endTime = toc;
+cpuEnd = cputime - cpuStart;
 %----------------------------------------------%
 % Plot which points the robot reached
 figure(1);
@@ -324,8 +344,7 @@ trajectory.Color(4) = 0.5;
 % end
 legend([goalPlot(1:2) trajectory],{'Start','Goal','Path'},'FontSize',12); 
 
-%----------------------------------------------%
-toc;
+
 %Plot Variables
 % figure(2); plot(xio(:,20),xio(:,19));
 % figure(3); plot(xio(:,19));

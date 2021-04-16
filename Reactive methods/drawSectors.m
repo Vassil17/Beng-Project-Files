@@ -7,7 +7,7 @@ y=range*sin(theta)+cur_x;
 x=[x cur_y x(1)];
 y=[y cur_x y(1)];
 
-if i==RGoal %&& strcmp(sector,'allowed')
+if i==RGoal && strcmp(sector,'allowed')
     h = patch(x,y,'g','FaceAlpha',0.25,'HandleVisibility','off');
 elseif strcmp(sector,'blocked')
     h = patch(x,y,'r','FaceAlpha',0.25,'HandleVisibility','off');

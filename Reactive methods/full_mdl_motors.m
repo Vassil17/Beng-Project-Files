@@ -95,7 +95,9 @@ Cd = 0.89;          % Drag Coefficent
 rho= 1.29;          % Air density
 W = 21.0719;        % m*g; %Weight
 %---------------------------------------------------------------------%
-
+I1 = xi(1);   % Current, Amps
+w1 = xi(2);   % Wheel speed, rad/s
+t1 = xi(3);   % Wheel torque, Nm
 %---------------------------------------------------------------------%
 % Motor Calculations
 % Motor 1
@@ -103,11 +105,11 @@ I1dot = ((-Ra*I1)-(Ke*w1)+Va1)/La;              % di/dt
 tau_friction = fric_constant*w1;
 w1dot = ((Kt*I1)-(bs*w1)-tau_friction)/Jm;      % Acceleration
 eff = (abs(I1)*-0.1330)+0.6;
-if (Va1 == 0),
+if (Va1 == 0)
     t1dot = (0-t1)/stepsize;
 else
-    t1dot = (Kt*I1*eff-t1)/stepsize;                          % Torque
-end;
+    t1dot = (Kt*I1*eff-t1)/stepsize;             % Torque
+end
 
 % Motor 2
 I2dot = ((-Ra*I2)-(Ke*w2)+Va2)/La;              % di/dt 

@@ -56,7 +56,7 @@ layer.obstacle_storage.angle = [];
 layer.obstacle_storage.distance = [];
 layer.obstacle_storage.centre = [];
 % set tenacity (0 for left, 1 for right)
-tenacity = 0;
+tenacity = 1;
 % set terminate to 0
 terminate = 0;
 % Initially the active activeLayer is the first (and only) one
@@ -76,7 +76,7 @@ max_x = 10;
 max_y = 10;
 resolution = 10;
 % Choose scenario (start and goal defined in scenarios)
-scenario = 8;
+scenario = 7;
 
 [obstacleMap,start,goal]=mapEnvironments(resolution,scenario);
 xi(19) = start(1) - 5;
@@ -152,9 +152,16 @@ end
 % Add the obstacles from Short term memory (STM):
 cond = ~isempty(layer(activeLayer).obstacle_storage.sector);
 if cond
-    [layer(activeLayer)] = addSTMobstacles_EG(layer(activeLayer),K,removefromSTM,Rt);
+    [layer(activeLayer)] = addSTMobstacles_EG_TGF(layer(activeLayer),K,removefromSTM,Rt);
 end
-
+%
+%
+% This section implements the sensor data filter:
+if getMode == 2
+    [layer(activeLayer)] = sensorDataFilter(layer(activeLayer));   
+end
+%
+%
 % If the mode is move to target (MTT), i.e. 1
 if getMode == 1
     if strcmp(layer(activeLayer).environment.sector(Rt),'allowed') 
@@ -197,7 +204,7 @@ end
 angleT2 = desired_psi + pi/2;
 %desired_psi = angleT2;
 [psi_sg,psi_vg,subgoal,virtgoal,gap,closestGap]=TGF_algorithm_EG(obstacleMap,...
-    scanTGF,cur_x,cur_y,angleToGoal,goal,cur_psi,angleT2);
+    scanTGF,cur_x,cur_y,angleToGoal,goal,cur_psi,angleT2,rangeTGF);
 % % psi_sg and psi_vg are in the algorithm FoR so need to convert back to the
 % % model one (i.e. just switch the signs around):
 psi_sg = -psi_sg;
@@ -324,8 +331,10 @@ psi_vg = -psi_vg;
     pause(0.001);
 %     % draw the sectors 
         for i=1:1:K
-        drawSectors(layer(activeLayer).environment.angle(i)...
+        if i == R
+            drawSectors(layer(activeLayer).environment.angle(i)...
             ,cur_x,cur_y,layer(activeLayer).environment.sector(i),K,i,R,range)
+        end
         end
     end
     if qq ==0

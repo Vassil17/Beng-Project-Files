@@ -204,18 +204,9 @@ while ~terminate
            gap(gapNumber).AngleDifference = abs((cur_psi - angleToGoal) - gap(gapNumber).ClosestGapAngle);
            gapSpan(gapNumber,:) = [SideAngle(1) SideAngle(2)];
         end
-        % Filter through the gapSpan to find which gap falls within another
-        for k = 1:1:gapNumber
-%          filterIndex = find(abs(gapSpan(k,1))>=abs(gapSpan(:,1)) & abs(gapSpan(k,2))>=abs(gapSpan(:,2)));
-%          filterIndex = filterIndex';
-%          clear coordinate;
-%          for id = 1:length(filterIndex)
-%           coordinate(id,:) = gap(filterIndex(id)).Centre;
-%          end
-%         distance = sqrt((cur_x - coordinate(:,2)).^2 + (cur_y - coordinate(:,1)).^2);
-% 
-%         mainGap = find(distance == min(distance));
 
+        for k = 1:1:gapNumber          
+                
            if gap(k).Width < 0.5 || isnan(gap(k).Width)
                % 0 means gap is blocked
               gap(k).Gap =0;
@@ -224,7 +215,50 @@ while ~terminate
               % 1 means gap is allowed
               gap(k).Gap = 1;
            end
-%         end
+            for i=1:1:size(gap,2)
+                Centre(i,:) = gap(i).Centre;
+            end
+            distanceToGap =  sqrt((cur_y - Centre(:,2)).^2 + ...
+                (cur_x - Centre(:,1)).^2);
+            globalGapAngle = cur_psi - gapSpan(k,:);
+            globalAngles = cur_psi - gapSpan(:,:);
+           globalGapAngle(globalGapAngle > 0) = 2*pi - globalGapAngle(globalGapAngle > 0); 
+           globalGapAngle(globalGapAngle < 0) = -globalGapAngle(globalGapAngle < 0);
+           globalAngles(globalAngles > 0) = 2*pi - globalAngles(globalAngles > 0); 
+           globalAngles(globalAngles < 0) = -globalAngles(globalAngles < 0);           
+            % check if it falls within another gap
+           
+           index1 = (globalGapAngle(1) >= globalAngles(:,1)) == ...
+               (globalGapAngle(1) <= globalAngles(:,2));
+           idx1 = find(index1==1);
+           condition1 = (~isempty(idx1)&&~all(idx1==k));
+           index2 = (globalGapAngle(2) >= globalAngles(:,1)) == ...
+               (globalGapAngle(2) <= globalAngles(:,2));
+           idx2 = find(index2==1);
+           condition2 = (~isempty(idx2)&&~all(idx2==k));
+           % if either is true, then the gap is within another gap
+           if condition1 
+              closest = min(distanceToGap(idx1));
+              % Delete the closest gap from the list (as it's the one that
+              % will be kept)
+              idx1(idx1==find(1==(distanceToGap==closest))) = [];
+
+              % Then delete all gaps that are in that list
+             for q=1:1:length(idx1)
+                gap(idx1(q)).Gap = 0;
+             end
+
+           elseif condition2
+              closest = min(distanceToGap(idx2));
+              % Delete the closest gap from the list (as it's the one that
+              % will be kept)
+             idx2(idx2==find(1==(distanceToGap==closest))) = [];
+              % Then delete all gaps that are in that list
+             for q=1:1:length(idx2)
+                gap(idx2(q)).Gap = 0;
+             end
+
+           end
         end % for k=1:1:gapNumber
         idx = find([gap.Gap] == 0);
         gap(idx) = [];

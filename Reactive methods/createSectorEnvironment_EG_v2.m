@@ -57,7 +57,7 @@ for i=1:1:K
        layer(activeLayer).environment.distance(i) = min(scan.Ranges(findObjects));
        layer(activeLayer).environment.sector(i) = "blocked";
    % Store the obstacles every X steps of the simulation
-   if mod(outer_loop,50) == 0
+   if mod(outer_loop,20) == 0
        layer(activeLayer).obstacle_storage.sector(end+1) =  i;
        layer(activeLayer).obstacle_storage.angle(end+1) = layer(activeLayer).environment.angle(i);
        layer(activeLayer).obstacle_storage.distance(end+1) = layer(activeLayer).environment.distance(i);

@@ -56,7 +56,7 @@ layer.obstacle_storage.angle = [];
 layer.obstacle_storage.distance = [];
 layer.obstacle_storage.centre = [];
 % set tenacity (0 for left, 1 for right)
-tenacity = 1;
+tenacity = 0;
 % set terminate to 0
 terminate = 0;
 % Initially the active activeLayer is the first (and only) one
@@ -76,7 +76,7 @@ max_x = 10;
 max_y = 10;
 resolution = 10;
 % Choose scenario (start and goal defined in scenarios)
-scenario = 7;
+scenario = 1;
 
 [obstacleMap,start,goal]=mapEnvironments(resolution,scenario);
 xi(19) = start(1) - 5;
@@ -89,6 +89,7 @@ sectorPlotStorage = [];
 qq = 0;
 %-----------------------------------------------------------------------%
 tic;
+cpuStart = cputime;
 %----------------------------------------------%
 
 for outer_loop = 1:(sim_time/dT)
@@ -128,10 +129,14 @@ for outer_loop = 1:(sim_time/dT)
     end
        
 % Run LiDAR sensor
+    if exist('scan','var')
+        prevScan = scan;
+    else
+        prevScan = 0;
+    end
        pose = [cur_y cur_x];
        [obstacleMap,scan,distance,objectDetected]=lidarSensor_T2(obstacleMap,pose,range);
        [~,scanTGF]=lidarSensor_TGF(obstacleMap,pose,rangeTGF,cur_psi);
-
 
 %-------------------------------------------------------------------------%
 % Behavior
@@ -148,6 +153,12 @@ end
     Rt,removefromSTM] = createSectorEnvironment_EG_v2(layer,...
     activeLayer,scan,K,angleToGoal, cur_x,cur_y,outer_loop,removefromSTM);
 %
+%
+%
+% % This section implements the sensor data filter:
+% if getMode == 2
+%     [layer(activeLayer)] = sensorDataFilter(layer(activeLayer),K,scan);   
+% end
 %
 % Add the obstacles from Short term memory (STM):
 cond = ~isempty(layer(activeLayer).obstacle_storage.sector);
@@ -311,7 +322,7 @@ desired_psi = angleT2;
     
     %----------------------------------------------%
     % refresh plot every X steps
-    if mod(outer_loop,50)==0
+    if mod(outer_loop,10)==0
     figure(1);
     clf; show(obstacleMap);grid on; hold on;
     xlabel('X position [m]');
@@ -325,10 +336,10 @@ desired_psi = angleT2;
     set(goalPlot(1:2),'linestyle','none');
     pause(0.001);
 %     % draw the sectors 
-%         for i=1:1:K
-%         drawSectors(layer(activeLayer).environment.angle(i)...
-%             ,cur_x,cur_y,layer(activeLayer).environment.sector(i),K,i,R,range)
-%         end
+        for i=1:1:K
+        drawSectors(layer(activeLayer).environment.angle(i)...
+            ,cur_x,cur_y,layer(activeLayer).environment.sector(i),K,i,R,range)
+        end
     end
     if qq ==0
         qq=qq+1;
@@ -337,7 +348,7 @@ desired_psi = angleT2;
         sectorPlotStorage(qq).R = R;
         condition = 1;
     else
-        condition = mod(outer_loop,100);
+        condition = mod(outer_loop,50);
     end
     if condition == 0
         qq = qq+1;
@@ -363,16 +374,17 @@ desired_psi = angleT2;
     %----------------------------------------------%
     
 end
-
+endTime = toc;
+cpuEnd = cputime - cpuStart;
 %----------------------------------------------%
 % Plot which points the robot reached
 figure(1);
 trajectory = plot(xio(:,20)+5,xio(:,19)+5,'k','LineStyle','--','LineWidth',2);
 trajectory.Color(4) = 0.5;
-legend([goalPlot(1:2),trajectory],{'Target','Start','Path'});
+legend([goalPlot(1:2),trajectory],{'Target','Start','Path'},'FontSize',12);
 
 %----------------------------------------------%
-toc;
+
 %Plot Variables
 % figure(2); plot(xio(:,20),xio(:,19));
 % figure(3); plot(xio(:,19));

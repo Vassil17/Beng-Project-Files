@@ -1,5 +1,5 @@
 function [psi_sg,psi_vg,subgoal,virtgoal,gap,closestGap]=TGF_algorithm_EG(obstacleMap,...
-    scan,cur_x,cur_y,angleToGoal,goal,cur_psi,angleT2)
+    scan,cur_x,cur_y,angleToGoal,goal,cur_psi,angleT2,range)
 %
 % This function contains the modified Tangential gap flow algorithm (TGF*)
 % that is used by the Escape Gap algorithm. It searches for gaps between
@@ -27,10 +27,31 @@ relativeAngleToGoal = cur_psi - angleToGoal;
 % Define three positions (top, middle and bottom of robot) to be used for
 % checking leaving condition
 pos = [cur_x-0.1 cur_y; cur_x cur_y; cur_x+0.1 cur_y];
+% then need to find angleToGoal in the standard coordinate system
+if angleToGoal <= 0
+    goalAngle = -angleToGoal;
+elseif angleToGoal >0 && angleToGoal <=pi
+    goalAngle = 2*pi - angleToGoal;
+end
+% add pi/2 because the 0 should be on the +ve x axis rather than +y axis
+goalAngle = goalAngle + pi/2;
 while ~terminate
     %
     % The leaving condition checks each position and its direct path to the
     % goal. The condition is only satisfied when all three paths are clear
+    %
+    % First check if the goal is within the sensor range:
+    % If it isn't within the range, then the point the path to which needs
+    % to be examined is the closest point in the same direction (goalAngle)
+    % but within the range.
+    distToGoal = sqrt((cur_x-goal(1))^2 + (cur_y - goal(2))^2);
+    if distToGoal <= range
+        checkTarget = goal;
+    else
+        checkTarget = [cur_x cur_y] + range*[sin(goalAngle) cos(goalAngle)];
+    end
+    %
+    %
     for ii=1:1:3
         start = pos(ii,:);
         [directPath(:,1),directPath(:,2)]=straightLine(start,goal,50);
@@ -299,15 +320,6 @@ end
     % additional psi_vg for the virtual goal
     % d is the magnitude of the goal vector
     d = sqrt((goal(1)-cur_x)^2 + (goal(2)-cur_y)^2);
-    % then need to find angleToGoal in the standard coordinate system
-    if angleToGoal <= 0
-        goalAngle = -angleToGoal;
-    elseif angleToGoal >0 && angleToGoal <=pi
-        goalAngle = 2*pi - angleToGoal;
-    end
-
-    % add pi/2 because the 0 should be on the +ve x axis rather than +y axis
-    goalAngle = goalAngle + pi/2;
     v_goal = [d*cos(goalAngle);d*sin(goalAngle)]; 
 %     angleT2 = angleT2 - goalAngle;
 %     v_goalT2 = [cos(angleT2) -sin(angleT2); sin(angleT2) cos(angleT2)]*v_goal;

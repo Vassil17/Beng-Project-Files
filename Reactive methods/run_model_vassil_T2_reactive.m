@@ -54,7 +54,7 @@ max_x = 10;
 max_y = 10;
 resolution = 10;
 % Choose scenario (start and goal defined in scenarios)
-scenario = 1;
+scenario = 16;
 
 [obstacleMap,start,goal]=mapEnvironments(resolution,scenario);
 xi(19) = start(1) - 5;
@@ -125,7 +125,12 @@ end
 % Rt
 [environment,Rt,obstacle_storage] = createSectorEnvironment_T2(scan,K,angleToGoal,...
     cur_x,cur_y,obstacle_storage,outer_loop);
-%
+
+cond = ~isempty(obstacle_storage.sector);
+if cond
+    [environment,obstacle_storage] = addSTMobstacles_T2(environment,obstacle_storage,K,Rt);
+end
+
 %
 % For left tenacity search anticlockwise (2), for right - clockwise (1)
 if tenacity == 0
@@ -145,11 +150,11 @@ else
     % mark the Rt sector as allowed in order to search its neighbours
     environment.sector(Rt) = 'allowed';
     [R] = calculateR(Rt,environment,'allowed',search,'T2');
+    environment.sector(Rt) = 'blocked';
     if R == Rt
        terminate=1;
        continue;
     end
-    environment.sector(Rt) = 'blocked';
 end
 
 desired_angle = environment.angle(R);
@@ -272,8 +277,8 @@ desired_psi = desired_psi + pi/2;
     if mod(outer_loop,5)==0
     figure(1);
     clf; show(obstacleMap);grid on; hold on;
-    xlabel('X position [m]');
-    ylabel('Y position [m]');
+    xlabel('X position [metres]');
+    ylabel('Y position [metres]');
     title('Map of the environment');
     drawrobot(0.2,xi(20)+5,xi(19)+5,xi(24),'b');
     % plot the goal point
@@ -294,7 +299,7 @@ desired_psi = desired_psi + pi/2;
         sectorPlotStorage(qq).R = R;
         condition = 1;
     else
-        condition = mod(outer_loop,100);
+        condition = mod(outer_loop,50);
     end
     if condition == 0
         qq = qq+1;
@@ -307,12 +312,17 @@ desired_psi = desired_psi + pi/2;
  %----------------------------------------------%
     
 end
-
+runtime = round(toc,2);
 %----------------------------------------------%
 % Plot which points the robot reached
 figure(1);
 trajectory = plot(xio(:,20)+5,xio(:,19)+5,'k','LineStyle','--','LineWidth',2);
 trajectory.Color(4) = 0.5;
+%
+% Print the running time
+txt = ['Time : ' num2str(runtime) ' seconds'];
+
+text(5.5,0.5,txt,'FontSize',12)
 % for q = 1:size(plotStorage,1)
 % drawrobot(0.2,plotStorage(q,1),plotStorage(q,2),plotStorage(q,3),'b');
 % end
@@ -326,10 +336,9 @@ trajectory.Color(4) = 0.5;
 %         drawSectors(angle,cur_x,cur_y,sector,K,k,R,range)
 %     end
 % end
-legend([goalPlot(1:2) trajectory],{'Start','Goal','Path'},'FontSize',12); 
+legend([goalPlot(1:2) trajectory],{'Start','Goal','Path'},'FontSize',11); 
 
 %----------------------------------------------%
-toc;
 %Plot Variables
 % figure(2); plot(xio(:,20),xio(:,19));
 % figure(3); plot(xio(:,19));

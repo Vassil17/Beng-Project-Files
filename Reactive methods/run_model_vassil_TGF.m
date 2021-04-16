@@ -12,7 +12,7 @@ clc;
 
 %----------------------------------------------%
 % Setup Simulation
-sim_time = 200;
+sim_time = 400;
 dT = 0.05;
 point = 1;
 xi = zeros(1,24); % initial state for x
@@ -32,7 +32,7 @@ desired_vel = 0;
 step = 0;
 %
 % LiDAR Range
-range = 3;
+range = 10;
 
 %----------------------------------------------%
 
@@ -42,7 +42,7 @@ max_x = 10;
 max_y = 10;
 resolution = 10;
 % Choose scenario (start and goal defined in scenarios)
-scenario = 7;
+scenario = 10;
 
 [obstacleMap,start,goal]=mapEnvironments(resolution,scenario);
 xi(19) = start(1) - 5;
@@ -53,6 +53,7 @@ plotStorage(1,:) = [start(2) start(1) xi(24)];
 
 %-----------------------------------------------------------------------%
 tic;
+cpuStart = cputime;
 %----------------------------------------------%
 
 for outer_loop = 1:(sim_time/dT)
@@ -225,6 +226,7 @@ if mod(outer_loop,100) == 0
 end
 %---------------------------------------------%
     figure(1);
+    if mod(outer_loop,10)==0
     clf; show(obstacleMap);grid on; hold on;
     xlabel('X position [m]');
     ylabel('Y position [m]');
@@ -243,6 +245,7 @@ end
      
     drawrobot(0.2,xi(20)+5,xi(19)+5,xi(24),'b');
     set(goalPlot,'linestyle','none');
+    end
     % plot the gaps:
     if isfield(gap,"Gap")
         for k=1:1:size(gap,2)
@@ -272,7 +275,8 @@ legend([goalPlot(1:4) trajectory],{'Start','Goal','SubGoal','Virtual Goal','Traj
 
 
 %----------------------------------------------%
-toc;
+endTime = toc;
+cpuEnd = cputime - cpuStart;
 %Plot Variables
 % figure(2); plot(xio(:,20),xio(:,19));
 % figure(3); plot(xio(:,19));
